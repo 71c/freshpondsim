@@ -8,6 +8,7 @@ import cProfile
 from time import time
 import matplotlib.pyplot as plt
 
+
 def logistic(x, x0, k):
     """logistic function with range (0, 1)
     x: input value
@@ -48,6 +49,7 @@ MAX_IDLE_PROPORTION = 0.8
 # proportion of non-runners who are stationary for some proportion of the time
 IDLE_PROB_GIVEN_NOT_RUN = IDLE_PROB / (1 - RUN_PROB)
 
+MAX_IDLE_TIME = 60 * 4
 
 def meters_per_second_to_miles_per_minute(x):
     return x / 26.8224
@@ -112,6 +114,91 @@ def rand_distance_prop():
     return random() + 2
 
 
+def soft_minimum(x, x_max, beta):
+    return x_max * (1 - beta * np.log(1 + np.exp((1 - x / x_max) / beta)))
+
+
+def soft_minimum_positive_1(x, x_max, beta):
+    tmp1 = np.log(1 + np.exp((1 - x / x_max) / beta))
+    tmp2 = np.log(1 + np.exp(1 / beta))
+    return x_max * (1 - tmp1 / tmp2)
+
+
+def soft_minimum_positive_2(x, x_max):
+    return x / np.sqrt(1 + (x / x_max)**2)
+
+
+def rand_walk_velocities_and_distances(n):
+    dist_props = np.array([rand_distance_prop() for _ in range(n)])
+    dists = dist_props * DISTANCE
+
+    a, b, c = 0.395, 1.1, 1.
+    idle_probs = a * np.exp(-(dist_props / b)**c)
+    # idle_probs = IDLE_PROB_GIVEN_NOT_RUN
+
+    # random walking speeds in meters per second
+    speeds = np.random.normal(loc=WALK_SPEED_MEAN, scale=WALK_SPEED_STD, size=n)
+    # convert to miles per minute
+    speeds = meters_per_second_to_miles_per_minute(speeds)
+
+    # get random idle proportions
+    idle_proportions = np.random.uniform(MIN_IDLE_PROPORTION, MAX_IDLE_PROPORTION, n)
+    # make some of them 0
+    idle_proportions[np.random.random(n) > idle_probs] = 0
+    
+    # maximum idle proportions such that the time idle <= MAX_IDLE_PROPORTION
+    max_idle_proportions = 1 / (1 + dists / (MAX_IDLE_TIME * speeds))
+    # constrain idle_proportions so that the times idle are not too long
+    # idle_proportions = np.minimum(idle_proportions, max_idle_proportions)
+    idle_proportions = soft_minimum_positive_1(idle_proportions, max_idle_proportions, 0.1)
+    # print(idle_proportions)
+
+    speeds = speeds * (1 - idle_proportions)
+
+    # make speeds have random signs
+    speeds[np.random.random(n) < 0.5] *= -1
+
+    return np.stack((speeds, dists)).T
+
+
+def rand_run_velocities_and_distances(n):
+    dist_props = np.array([rand_distance_prop() for _ in range(n)])
+    dists = dist_props * DISTANCE
+    speeds = rand_run_speed(n)
+    return np.stack((speeds, dists)).T
+
+
+def rand_velocities_and_distances(n):
+    n_runs = np.random.binomial(n, RUN_PROB)
+    n_walks = n - n_runs
+
+    walks = rand_walk_velocities_and_distances(n_walks)
+    runs = rand_run_velocities_and_distances(n_runs)
+    together = np.concatenate((walks, runs), axis=0)
+    np.random.shuffle(together)
+
+    return together
+
+
+def compare_methods_durations():
+    n = 400000
+
+    speeds1, dists1 = rand_velocities_and_distances(n).T
+
+    speeds2, dists2 = rand_velocity(n), np.array([rand_distance_prop() * DISTANCE for _ in range(n)])
+
+    print(max(dists1 / abs(speeds1)) / 60)
+    print(max(dists2 / abs(speeds2)) / 60)
+
+    log = False
+    plt.hist(dists1 / abs(speeds1) / 60, bins='auto', density=True, log=log, histtype='step', label='new method')
+    plt.hist(dists2 / abs(speeds2) / 60, bins='auto', density=True, log=log, histtype='step', label='og method')
+    plt.legend()
+    plt.title('comparison of methods, histograms of duration')
+    plt.xlabel('duration (hours)')
+    plt.ylabel('probability density')
+    plt.show()
+
 
 def main():
     min_λ, max_λ = 0.01, 1.1185034511
@@ -121,11 +208,7 @@ def main():
 
     entrances, entrance_weights = zip(*ENTRANCES_AND_WEIGHTS)
 
-    t = time()
-    sim = FreshPondSim(DISTANCE, 0, 14400, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)
-
-    print(time() - t)
-
+    sim = FreshPondSim(DISTANCE, 0, 1440, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)
 
 
     # cProfile.runctx('FreshPondSim(DISTANCE, 0, 14400, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)', globals(), locals(), sort='cumulative')
@@ -141,9 +224,9 @@ def main():
     # plt.hist(abs(1/u), bins='auto')
     # plt.show()
 
-    durations = [log(p.end_time - p.start_time) for p in sim.pedestrians]
-    plt.hist(durations, bins='auto')
-    plt.show()
+    # durations = [np.log(p.end_time - p.start_time) for p in sim.pedestrians]
+    # plt.hist(durations, bins='auto')
+    # plt.show()
 
     # distances = [p.travel_distance for p in sim.pedestrians]
     # plt.hist(distances, bins='auto')
@@ -154,6 +237,10 @@ def main():
     # props = [rand_distance_prop() for _ in range(50000)]
     # plt.hist(props, bins='auto')
     # plt.show()
+
+
+
+    
 
 
 
