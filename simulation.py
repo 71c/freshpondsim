@@ -103,15 +103,17 @@ def get_double_logistic_day_rate_func(min_λ, max_λ, rise_time, rise_rate, fall
 
 
 def rand_distance_prop():
+    if random() < 0.9:
+        n_times = 0
+    elif random() < 0.7:
+        n_times = 1
+    else:
+        n_times = 2
     if random() < 0.5:
-        return 1.0
-    if random() < 0.8:
-        if random() < 0.4:
-            return (2*random()-1) * 0.3 + 0.9
-        return random()
-    if random() < 0.7:
-        return random() + 1
-    return random() + 2
+        return n_times + 1
+    if random() < 0.4:
+        return np.random.normal(loc=n_times + 1, scale=0.12)
+    return n_times + random()
 
 
 def soft_minimum(x, x_max, beta):
@@ -132,9 +134,8 @@ def rand_walk_velocities_and_distances(n):
     dist_props = np.array([rand_distance_prop() for _ in range(n)])
     dists = dist_props * DISTANCE
 
-    a, b, c = 0.395, 1.1, 1.
+    a, b, c = 0.395, 1.1, 1.0
     idle_probs = a * np.exp(-(dist_props / b)**c)
-    # idle_probs = IDLE_PROB_GIVEN_NOT_RUN
 
     # random walking speeds in meters per second
     speeds = np.random.normal(loc=WALK_SPEED_MEAN, scale=WALK_SPEED_STD, size=n)
@@ -151,7 +152,6 @@ def rand_walk_velocities_and_distances(n):
     # constrain idle_proportions so that the times idle are not too long
     # idle_proportions = np.minimum(idle_proportions, max_idle_proportions)
     idle_proportions = soft_minimum_positive_1(idle_proportions, max_idle_proportions, 0.1)
-    # print(idle_proportions)
 
     speeds = speeds * (1 - idle_proportions)
 
@@ -180,7 +180,7 @@ def rand_velocities_and_distances(n):
     return together
 
 
-def compare_methods_durations():
+def compare_methods_durations_distribution():
     n = 400000
 
     speeds1, dists1 = rand_velocities_and_distances(n).T
@@ -197,6 +197,24 @@ def compare_methods_durations():
     plt.title('comparison of methods, histograms of duration')
     plt.xlabel('duration (hours)')
     plt.ylabel('probability density')
+    plt.show()
+
+
+def compare_methods_pace_vs_distance():
+    n = 20000
+    speeds_new, dists_new = rand_velocities_and_distances(n).T
+
+    speeds_old, dists_old = rand_velocity(n), np.array([rand_distance_prop() * DISTANCE for _ in range(n)])
+
+    plt.scatter(dists_new, 1/abs(speeds_new), s=0.5**2)
+    plt.title('new method')
+    plt.xlabel('distance (miles)')
+    plt.ylabel('pace (minutes per mile)')
+    plt.figure()
+    plt.scatter(dists_old, 1/abs(speeds_old), s=0.5**2)
+    plt.title('old method')
+    plt.xlabel('distance (miles)')
+    plt.ylabel('pace (minutes per mile)')
     plt.show()
 
 
@@ -237,11 +255,6 @@ def main():
     # props = [rand_distance_prop() for _ in range(50000)]
     # plt.hist(props, bins='auto')
     # plt.show()
-
-
-
-    
-
 
 
 
