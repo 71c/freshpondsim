@@ -1,5 +1,5 @@
 from freshpondsim import FreshPondSim, FreshPondPedestrian
-from simulation import *
+from simulation_defaults import *
 import math
 
 
@@ -70,11 +70,7 @@ if __name__ == '__main__':
 
     # p = FreshPondPedestrian(DISTANCE, 0, DISTANCE, 0, time_delta=0)
 
-    # print("Trying to make zero velocity pedestrian.")
-    # try:
-    #     p = FreshPondPedestrian(distance_around=DISTANCE, start_pos=0, travel_distance=0, start_time=0, velocity=0)
-    # except ValueError as e:
-    #     print("Error message:", e)
+    
 
 
     # p = FreshPondPedestrian(distance_around=DISTANCE, start_pos=0, travel_distance=0, start_time=0, time_delta=math.inf)

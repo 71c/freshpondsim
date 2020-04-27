@@ -46,5 +46,14 @@ def test_intersection_time():
         assert_intersection_time_expected(d, a, b)
 
 
+def test_init_edge_cases():
+    print("Trying to make zero velocity pedestrian.")
+    try:
+        p = FreshPondPedestrian(distance_around=DISTANCE, start_pos=0, travel_distance=0, start_time=0, velocity=0)
+    except ValueError as e:
+        print("Error message:", e)
+
+
 if __name__ == '__main__':
     test_intersection_time()
+    test_init_edge_cases()
