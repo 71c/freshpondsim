@@ -9,14 +9,6 @@ def is_real(x):
     return isinstance(x, Real) and math.isfinite(x)
 
 
-# def assert_is_real_in_range(x, name, a=None, b=None):
-#     assert a is None or isinstance(a, Real)
-#     assert b is None or isinstance(b, Real)
-#     if not (a is None and b is None):
-#         assert a <= b
-#         if not (a <= x <= b):
-#             raise ValueError(f"{name} must be between {a} and {b}")
-
 def assert_real(val, name):
     if not is_real(val):
         print(f"{name} should be a real number but is {val}")
@@ -30,7 +22,6 @@ def assert_nonnegative_real(val, name):
 def assert_positive_real(val, name):
     if not (is_real(val) and val > 0):
         raise ValueError(f"{name} should be a number in range (0, inf) but is {val}")
-
 
 
 class FreshPondPedestrian:
@@ -48,13 +39,13 @@ class FreshPondPedestrian:
         self.distance_around = distance_around
         self.travel_distance = travel_distance
 
-    def _is_in_range(self, t):
-        return self.start_time <= t <= self.end_time or math.isclose(t, self.start_time) or math.isclose(t, self.end_time)
+    def is_in_range(self, t):  
+        return self.start_time <= t <= self.end_time
 
     def get_position(self, t):
         if t is None:
             return None
-        if not self._is_in_range(t):
+        if not (self.is_in_range(t) or math.isclose(t, self.start_time) or math.isclose(t, self.end_time)):
             return None
         return (self.start_pos + (t - self.start_time) * self.velocity) % self.distance_around
 
@@ -89,6 +80,9 @@ class FreshPondPedestrian:
         if t > max_time:
             return None
         return t
+
+    def intersects(self, other):
+        return self.intersection_time(other) is not None
 
     def __repr__(self):
         return(f'FreshPondPedestrian(start_time={self.start_time:.2f}, end_time={self.end_time:.2f}, start_pos={self.start_pos}, mile_time={1/self.velocity:.2f})')
@@ -157,12 +151,15 @@ class FreshPondSim:
         self._initialize_pedestrians()
 
     def _distance(self, a, b):
+        """signed distance of a relative to b"""
         return circular_diff(a % self.dist_around, b % self.dist_around, self.dist_around)
 
     def _distance_from(self, b):
+        """returns a function that returns the signed sitance from b"""
         return lambda a: self._distance(a, b)
 
     def _abs_distance_from(self, b):
+        """returns a function that returns the distance from b"""
         return lambda a: abs(self._distance(a, b))
 
     def _closest_exit(self, dist):
@@ -184,40 +181,22 @@ class FreshPondSim:
             original_exit = entrance + dist * sign(velocity)
             corrected_exit = self._closest_exit(original_exit)
             corrected_dist = abs(corrected_exit - entrance)
-
             if math.isclose(corrected_dist, 0, abs_tol=1e-10):
                 corrected_dist = self.dist_around
-                corrected_exit = entrance + sign(velocity) * corrected_dist
-            # print(f"dist: {dist}, corrected_dist: {corrected_dist}")
-            
-            p = FreshPondPedestrian(entrance, corrected_dist, start_time, velocity, self.dist_around)
-            
 
-            final_pos = p.get_position(p.end_time)
-            dist_to_final_pos = self._abs_distance_from(final_pos)
-            closest_exit = min(self.entrances, key=dist_to_final_pos)
-            assert math.isclose(dist_to_final_pos(closest_exit), 0, abs_tol=1e-10)
+            self.pedestrians.append(FreshPondPedestrian(entrance, corrected_dist, start_time, velocity, self.dist_around))
 
-            initial_pos = p.get_position(p.start_time)
-            dist_to_initial_pos = self._abs_distance_from(initial_pos)
-            closest_exit = min(self.entrances, key=dist_to_initial_pos)
-            assert math.isclose(dist_to_initial_pos(closest_exit), 0, abs_tol=1e-10)
+    def n_people_saw(self, p):
+        n = 0
+        for q in self.pedestrians:
+            if p.intersects(q):
+                n += 1
+        return n
 
-            assert self._distance(initial_pos, entrance) == 0
-            assert math.isclose(self._distance(corrected_exit, final_pos), 0, abs_tol=1e-10)
-
-            assert math.isclose((p.start_pos + p.travel_distance * sign(p.velocity)) - corrected_exit, 0, abs_tol=1e-10)
-            
-
-            self.pedestrians.append(p)
-
-
-
-
-
-
-
-
-
-
+    def n_people(self, t):
+        n = 0
+        for q in self.pedestrians:
+            if q.is_in_range(t):
+                n += 1
+        return n
 

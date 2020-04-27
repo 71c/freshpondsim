@@ -7,6 +7,7 @@ from freshpondsim import FreshPondSim, FreshPondPedestrian
 import cProfile
 from time import time
 import matplotlib.pyplot as plt
+from tictoc import tic, toc
 
 
 def logistic(x, x0, k):
@@ -226,13 +227,13 @@ def main():
 
     entrances, entrance_weights = zip(*ENTRANCES_AND_WEIGHTS)
 
-    t = time()
+    # t = time()
     sim = FreshPondSim(DISTANCE, 0, 1440, entrances, entrance_weights, λ, rand_velocities_and_distances)
-    print(time() - t)
+    # print(time() - t)
 
     # print(sim.pedestrians)
 
-    # cProfile.runctx('FreshPondSim(DISTANCE, 0, 14400, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)', globals(), locals(), sort='cumulative')
+    # cProfile.runctx('FreshPondSim(DISTANCE, 0, 14400, entrances, entrance_weights, λ, rand_velocities_and_distances)', globals(), locals(), sort='cumulative')
 
     # print(max(sim.pedestrians, key=lambda p: p.end_time - p.start_time))
 
@@ -258,6 +259,60 @@ def main():
     # props = [rand_distance_prop() for _ in range(50000)]
     # plt.hist(props, bins='auto')
     # plt.show()
+
+    # start_time = 700
+    middle_time = 700
+    mile_times = np.linspace(1, 30, 960)
+    saws = []
+    tic()
+    for mile_time in mile_times:
+        start_time = middle_time - mile_time * DISTANCE / 2
+        p = FreshPondPedestrian(0, DISTANCE, start_time, 1/mile_time, DISTANCE)
+        end_time = p.end_time
+        n_saw = sim.n_people_saw(p)
+        n_at_beginning = sim.n_people(start_time)
+        n_at_middle = sim.n_people((start_time + end_time) / 2)
+        n_at_end = sim.n_people(end_time)
+        # print(f"Start time: {start_time}")
+        # print(f"End time: {end_time}")
+        # print(f"Pace: {mile_time} min/mi")
+        # print(f"Saw: {n_saw}")
+        # print(f"n at beginning: {n_at_beginning}")
+        # print(f"n at middle: {n_at_middle}")
+        # print(f"n at end: {n_at_end}")
+        # print()
+
+        saws.append(n_saw)
+    toc()
+
+    plt.plot(mile_times, saws)
+    plt.show()
+
+
+
+    def test():
+        middle_time = 700
+        mile_times = np.linspace(1, 30, 960)
+        saws = []
+        for mile_time in mile_times:
+            start_time = middle_time - mile_time * DISTANCE / 2
+            p = FreshPondPedestrian(0, DISTANCE, start_time, 1/mile_time, DISTANCE)
+            end_time = p.end_time
+            n_saw = sim.n_people_saw(p)
+            n_at_beginning = sim.n_people(start_time)
+            n_at_middle = sim.n_people((start_time + end_time) / 2)
+            n_at_end = sim.n_people(end_time)
+
+            saws.append(n_saw)
+
+    cProfile.runctx('test()', globals(), locals(), sort='cumulative')
+
+
+
+
+    
+
+
 
 
 
