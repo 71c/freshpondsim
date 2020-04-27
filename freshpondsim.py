@@ -201,23 +201,24 @@ def sign(x):
 
 
 class FreshPondSim:
-    def __init__(self, distance, start_time, stop_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func):
+    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func):
         assert_positive_real(distance, 'distance')
         assert_real(start_time, 'start_time')
-        assert_real(stop_time, 'stop_time')
-        if not (start_time < stop_time):
-            raise ValueError(f"start_time should be less than stop_time")
+        assert_real(end_time, 'end_time')
+        if not (start_time < end_time):
+            raise ValueError(f"start_time should be less than end_time")
         assert len(entrances) == len(entrance_weights)
         self.start_time = start_time
-        self.stop_time = stop_time
+        self.end_time = end_time
         self.dist_around = distance
         self.entrances = entrances
         self.entrance_weights = entrance_weights
         self.entrance_rate_func = entrance_rate_func
         self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
         
-        self._initialize_pedestrians()
-        self._compute_counts()
+        self.pedestrians = SortedList(key=lambda p: p.start_time)
+        self._counts = SortedDict()
+        self.set_random_pedestrians()
 
     def _distance(self, a, b):
         """signed distance of a relative to b"""
@@ -239,34 +240,57 @@ class FreshPondSim:
         corrected_dist = dist + diff
         return corrected_dist
 
-    def _initialize_pedestrians(self):
-        pedestrians = []
-
-        start_times = list(random_times(self.start_time, self.stop_time, self.entrance_rate_func))
+    def set_random_pedestrians(self):
+        """Refreshes the pedestrians in the simulation to random ones"""
+        self.clear_pedestrians()
+        
+        start_times = list(random_times(self.start_time, self.end_time, self.entrance_rate_func))
         n_pedestrians = len(start_times)
         entrances = random.choices(population=self.entrances, weights=self.entrance_weights, k=n_pedestrians)
         velocities, distances = self.rand_velocities_and_distances(n_pedestrians).T
-        for start_time, entrance, velocity, dist in zip(start_times, entrances, velocities, distances):
-            assert dist > 0
-            original_exit = entrance + dist * sign(velocity)
-            corrected_exit = self._closest_exit(original_exit)
-            corrected_dist = abs(corrected_exit - entrance)
-            if math.isclose(corrected_dist, 0, abs_tol=1e-10):
-                corrected_dist = self.dist_around
+        
+        def pedestrians_generator():
+            for start_time, entrance, velocity, dist in zip(start_times, entrances, velocities, distances):
+                assert dist > 0
+                original_exit = entrance + dist * sign(velocity)
+                corrected_exit = self._closest_exit(original_exit)
+                corrected_dist = abs(corrected_exit - entrance)
+                if math.isclose(corrected_dist, 0, abs_tol=1e-10):
+                    corrected_dist = self.dist_around
+                yield FreshPondPedestrian(self.dist_around, entrance, corrected_dist, start_time, velocity)
+        
+        self.add_pedestrians(pedestrians_generator())
 
-            pedestrians.append(FreshPondPedestrian(self.dist_around, entrance, corrected_dist, start_time, velocity))
+    def clear_pedestrians(self):
+        """Removes all pedestrains in the simulation"""
+        self.pedestrians.clear()
+        self._reset_counts()
 
-        self.pedestrians = SortedList(pedestrians, key=lambda p: p.start_time)
+    def add_pedestrians(self, pedestrians):
+        """Adds all the given pedestrians to the simulation"""
+        def checked_pedestrians():
+            for p in pedestrians:
+                self._assert_pedestrian_in_range(p)
+                yield p
+        self.pedestrians.update(checked_pedestrians())
+        self._recompute_counts()
+
+    def _assert_pedestrian_in_range(self, p):
+        """Makes sure the pedestrian's start time is in the simulation's
+        time interval"""
+        if not (self.start_time <= p.start_time < self.end_time):
+            raise ValueError("Pedestrian start time is not in range [start_time, end_time)")
 
     def add_pedestrian(self, p):
         """Adds a new pedestrian to the simulation"""
+        self._assert_pedestrian_in_range(p)
         self.pedestrians.add(p)
 
         # add a new breakpoint at the pedestrian's start time if it not there
         self._counts[p.start_time] = self.n_people(p.start_time)
 
         # add a new breakpoint at the pedestrian's end time if it not there
-        self._counts[p.end_time] = self.n_people(p.start_time)
+        self._counts[p.end_time] = self.n_people(p.end_time)
 
         # increment all the counts in the pedestrian's interval of time
         # inclusive on the left, exclusive on the right
@@ -276,9 +300,19 @@ class FreshPondSim:
         for t in self._counts.irange(p.start_time, p.end_time, inclusive=(True, False)):
             self._counts[t] += 1
 
-    def _compute_counts(self):
-        self._counts = SortedDict([(self.start_time, 0)])
-        
+    def _reset_counts(self):
+        """Clears _counts and sets count at start_time to 0"""
+        self._counts.clear()
+        self._counts[self.start_time] = 0
+
+    def _recompute_counts(self):
+        """Store how many people there are whenever someone enters or exits so
+        the number of people at a given time can be found quickly later"""
+        self._reset_counts()
+
+        if self.num_pedestrians() == 0:
+            return
+
         start_times = [] # pedestrians are already sorted by start time
         end_times = SortedList()
         for pedestrian in self.pedestrians:
@@ -286,17 +320,24 @@ class FreshPondSim:
             end_times.add(pedestrian.end_time)
 
         n = len(start_times)
-        curr_count = 0
+        curr_count = 0 # current number of people
         start_times_index = 0
         end_times_index = 0
-        starts_done = False
-        ends_done = False
+        starts_done = False # whether all the start times have been added
+        ends_done = False # whether all the end times have been added
         while not (starts_done and ends_done):
+            # determine whether a start time or an end time should be added next
+            # store this in the variable take_start which is true if a start
+            # time should be added next
             if starts_done:
+                # already added all the start times; add an end time
                 take_start = False
             elif ends_done:
+                # already added all the end times; add a start time
                 take_start = True
             else:
+                # didn't add all the end times nor all the start times
+                # add the time that is earliest
                 next_start_time = start_times[start_times_index]
                 next_end_time = end_times[end_times_index]
                 take_start = next_start_time < next_end_time
@@ -329,12 +370,14 @@ class FreshPondSim:
     def n_people(self, t):
         """Returns the number of people at a given time"""
         if t in self._counts:
-            n = self._counts[t]
-        elif t <= self.start_time:
-            n = self._counts[self.start_time]
+            return self._counts[t]
+        elif t < self.start_time:
+            return 0
         else:
             index = self._counts.bisect_left(t)
-            n = self._counts.peekitem(index - 1)[1]
+            return self._counts.peekitem(index - 1)[1]
 
-        return n
+    def num_pedestrians(self):
+        """Returns the total number of pedestrians in the simulation"""
+        return len(self.pedestrians)
 
