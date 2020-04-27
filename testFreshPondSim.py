@@ -1,6 +1,8 @@
 from freshpondsim import FreshPondSim, FreshPondPedestrian
 from simulation_defaults import *
 import math
+from tictoc import tic, toc
+import cProfile
 
 
 def assert_equals(a, b):
@@ -17,7 +19,7 @@ def slow_n_people(sim, t):
 
 
 def test_n_people():
-    sim = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, day_rate_func, rand_velocities_and_distances)
+    sim = default_sim()
 
     spacing = 0.5
 
@@ -44,7 +46,7 @@ def test_n_people():
 
 
 def test_add_pedestrians():
-    sim = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, day_rate_func, rand_velocities_and_distances)
+    sim = default_sim()
 
     sim.clear_pedestrians()
     sim.add_pedestrians([])
@@ -59,10 +61,47 @@ def test_add_pedestrians():
     assert_equals(sim.num_pedestrians(), 2)
 
 
+def test_interpolation():
+    tic('FreshPondSim without interpolation init')
+    sim1 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=False)
+    toc('FreshPondSim without interpolation init')
+
+    tic('FreshPondSim with interpolation init')
+    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=5, interpolate_debug=False)
+    toc('FreshPondSim with interpolation init')
+
+    print()
+
+    def test_non_interpolation(n):
+        for i in range(n):
+            tic(f'FreshPondSim without interpolation reset {i+1}')
+            sim1.set_random_pedestrians()
+            toc(f'FreshPondSim without interpolation reset {i+1}')
+        print()
+
+    def test_interpolation(n):
+        for i in range(n):
+            tic(f'FreshPondSim with interpolation reset {i+1}')
+            sim2.set_random_pedestrians()
+            toc(f'FreshPondSim with interpolation reset {i+1}')
+        print()
+
+    
+    # cProfile.runctx('test_non_interpolation(40)', globals(), locals(), sort='cumulative')
+    # cProfile.runctx('test_interpolation(40)', globals(), locals(), sort='cumulative')
+
+    test_non_interpolation(10)
+    test_interpolation(100)
+
+
+
 
 if __name__ == '__main__':
     test_n_people()
     test_add_pedestrians()
+
+    test_interpolation()
+
 
 
     # p = FreshPondPedestrian(1, 0, 0, 0, time_delta=10)

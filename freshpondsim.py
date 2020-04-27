@@ -5,6 +5,7 @@ from pynverse import inversefunc
 import scipy.integrate as integrate
 from sortedcontainers import SortedList, SortedDict
 from tictoc import tic, toc
+from function_interpolator import FunctionInterpolator
 
 
 def is_real(x):
@@ -165,16 +166,22 @@ def newtons_method(x0, func, d_func, tol, max_iter):
     return x
 
 
-def rand_next_time(t0, λfunc):
+def rand_next_time(t0, λfunc, λfunc_integral=None):
     a = -math.log(random.random())
 
-    def L(t):
-        y, abserr = integrate.quad(λfunc, t0, t)
-        return y - a
+    if λfunc_integral is None:
+        def L(t):
+            y, abserr = integrate.quad(λfunc, t0, t)
+            return y - a
+    else:
+        t0_integral = λfunc_integral(t0)
+        def L(t):
+            y = λfunc_integral(t) - t0_integral
+            return y - a
 
     tol = 1e-4
 
-    x = newtons_method(t0, L, λfunc, tol, 8)
+    x = newtons_method(t0, L, λfunc, tol, 20)
 
     if abs(L(x)) > tol:
         inv_L = inversefunc(L, y_values=[0], accuracy=5)
@@ -183,11 +190,11 @@ def rand_next_time(t0, λfunc):
     return x
 
 
-def random_times(t0, t_max, λfunc):
-    t = rand_next_time(t0, λfunc)
+def random_times(t0, t_max, λfunc, λfunc_integral=None):
+    t = rand_next_time(t0, λfunc, λfunc_integral)
     while t < t_max:
         yield t
-        t = rand_next_time(t, λfunc)
+        t = rand_next_time(t, λfunc, λfunc_integral)
 
 
 def circular_diff(a, b, max_val):
@@ -201,7 +208,7 @@ def sign(x):
 
 
 class FreshPondSim:
-    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func):
+    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func, interpolate=False, interpolate_res=None, interpolate_debug=False):
         assert_positive_real(distance, 'distance')
         assert_real(start_time, 'start_time')
         assert_real(end_time, 'end_time')
@@ -215,7 +222,17 @@ class FreshPondSim:
         self.entrance_weights = entrance_weights
         self.entrance_rate_func = entrance_rate_func
         self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
-        
+
+        if interpolate:
+            if interpolate_res is None:
+                raise ValueError("Specify interpolate_res for interpolation")
+            def integral_func(t):
+                y, abserr = integrate.quad(entrance_rate_func, start_time, t)
+                return y
+            self.entrance_rate_func_integral = FunctionInterpolator(integral_func, interpolate_res, debug=interpolate_debug)
+        else:
+            self.entrance_rate_func_integral = None
+
         self.pedestrians = SortedList(key=lambda p: p.start_time)
         self._counts = SortedDict()
         self.set_random_pedestrians()
@@ -244,7 +261,7 @@ class FreshPondSim:
         """Refreshes the pedestrians in the simulation to random ones"""
         self.clear_pedestrians()
         
-        start_times = list(random_times(self.start_time, self.end_time, self.entrance_rate_func))
+        start_times = list(random_times(self.start_time, self.end_time, self.entrance_rate_func, self.entrance_rate_func_integral))
         n_pedestrians = len(start_times)
         entrances = random.choices(population=self.entrances, weights=self.entrance_weights, k=n_pedestrians)
         velocities, distances = self.rand_velocities_and_distances(n_pedestrians).T
@@ -375,7 +392,7 @@ class FreshPondSim:
             return 0
         else:
             index = self._counts.bisect_left(t)
-            return self._counts.peekitem(index - 1)[1]
+            return self._counts.values()[index - 1]
 
     def num_pedestrians(self):
         """Returns the total number of pedestrians in the simulation"""
