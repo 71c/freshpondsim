@@ -30,3 +30,7 @@ impossible! (or infinite time to get there)
 
 if travel_distance != 0 and abs(velocity) != 0
 normal
+
+
+i found this cool web-page
+https://stackoverflow.com/questions/7423744/how-should-i-perform-imports-in-a-python-module-without-polluting-its-namespace#7424390
