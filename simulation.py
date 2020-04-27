@@ -226,8 +226,11 @@ def main():
 
     entrances, entrance_weights = zip(*ENTRANCES_AND_WEIGHTS)
 
-    sim = FreshPondSim(DISTANCE, 0, 1440, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)
+    t = time()
+    sim = FreshPondSim(DISTANCE, 0, 1440, entrances, entrance_weights, λ, rand_velocities_and_distances)
+    print(time() - t)
 
+    # print(sim.pedestrians)
 
     # cProfile.runctx('FreshPondSim(DISTANCE, 0, 14400, entrances, entrance_weights, λ, rand_velocity, rand_distance_prop)', globals(), locals(), sort='cumulative')
 

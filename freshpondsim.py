@@ -9,13 +9,38 @@ def is_real(x):
     return isinstance(x, Real) and math.isfinite(x)
 
 
+# def assert_is_real_in_range(x, name, a=None, b=None):
+#     assert a is None or isinstance(a, Real)
+#     assert b is None or isinstance(b, Real)
+#     if not (a is None and b is None):
+#         assert a <= b
+#         if not (a <= x <= b):
+#             raise ValueError(f"{name} must be between {a} and {b}")
+
+def assert_real(val, name):
+    if not is_real(val):
+        print(f"{name} should be a real number but is {val}")
+
+
+def assert_nonnegative_real(val, name):
+    if not (is_real(val) and val >= 0):
+        raise ValueError(f"{name} should be a number in range [0, inf) but is {val}")
+
+
+def assert_positive_real(val, name):
+    if not (is_real(val) and val > 0):
+        raise ValueError(f"{name} should be a number in range (0, inf) but is {val}")
+
+
+
 class FreshPondPedestrian:
     def __init__(self, start_pos, travel_distance, start_time, velocity, distance_around):
-        assert is_real(start_pos) and 0 <= start_pos <= distance_around
-        assert is_real(travel_distance) and travel_distance >= 0
-        assert is_real(start_time)
-        assert is_real(velocity)
-        assert is_real(distance_around) and distance_around > 0
+        if not (is_real(start_pos) and 0 <= start_pos <= distance_around):
+            raise ValueError(f"start_pos {start_pos} is not a number in range [0, distance_around]")
+        assert_nonnegative_real(travel_distance, 'travel_distance')
+        assert_real(start_time, 'start_time')
+        assert_real(velocity, 'velocity')
+        assert_positive_real(distance_around, 'distance_around')
         self.start_pos = start_pos
         self.start_time = start_time
         self.end_time = math.inf if velocity == 0 else start_time + travel_distance / abs(velocity)
@@ -104,57 +129,87 @@ def random_times(t0, t_max, λfunc):
         t = rand_next_time(t, λfunc)
 
 
-def circular_difference(a, b, max_val):
+def circular_diff(a, b, max_val):
     c = a - b
     c = (c + max_val * 0.5) % max_val - max_val * 0.5
     return c
 
 
+def sign(x):
+    return 1 if x > 0 else -1 if x < 0 else 0
+
+
 class FreshPondSim:
-    def __init__(self, distance, start_time, stop_time, entrances, entrance_weights, entrance_rate_func, rand_velocity_func, rand_distance_prop_func):
-        assert is_real(distance) and distance > 0
-        assert is_real(start_time)
-        assert is_real(stop_time)
-        assert start_time < stop_time
+    def __init__(self, distance, start_time, stop_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func):
+        assert_positive_real(distance, 'distance')
+        assert_real(start_time, 'start_time')
+        assert_real(stop_time, 'stop_time')
+        if not (start_time < stop_time):
+            raise ValueError(f"start_time should be less than stop_time")
+        assert len(entrances) == len(entrance_weights)
         self.start_time = start_time
         self.stop_time = stop_time
-        self.distance_around = distance
-        assert len(entrances) == len(entrance_weights)
+        self.dist_around = distance
         self.entrances = entrances
         self.entrance_weights = entrance_weights
         self.entrance_rate_func = entrance_rate_func
-        self.rand_velocity = rand_velocity_func
-        self.rand_distance_prop = rand_distance_prop_func
+        self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
+        self._initialize_pedestrians()
 
+    def _distance(self, a, b):
+        return circular_diff(a % self.dist_around, b % self.dist_around, self.dist_around)
+
+    def _distance_from(self, b):
+        return lambda a: self._distance(a, b)
+
+    def _abs_distance_from(self, b):
+        return lambda a: abs(self._distance(a, b))
+
+    def _closest_exit(self, dist):
+        """Returns the closest number to dist that is equivalent mod dist_around
+        to an element of entrances"""
+        closest_exit = min(self.entrances, key=self._abs_distance_from(dist))
+        diff = self._distance(closest_exit, dist)
+        corrected_dist = dist + diff
+        return corrected_dist
+
+    def _initialize_pedestrians(self):
         self.pedestrians = []
-        self.initialize_pedestrians()
-
-    def initialize_pedestrians(self):
-        # start_times = list(random_times(self.start_time, self.stop_time, self.entrance_rate_func))
-        # entrances = random.choices(population=self.entrances, weights=self.entrance_weights, k=len(start_times))
-        # for start_time, entrance in zip(start_times, entrances):
-        #     proposed_distance = self.rand_distance_prop() * self.distance_around
-        #     closest_exit = min(self.entrances, key=lambda x: abs(circular_difference(proposed_distance % self.distance_around, x, self.distance_around)))
-        #     diff = circular_difference(proposed_distance % self.distance_around, closest_exit, self.distance_around)
-        #     distance = proposed_distance - diff
-        #     if math.isclose(distance, 0, abs_tol=1e-10):
-        #         distance = self.distance_around
-        #     velocity = self.rand_velocity()
-        #     self.pedestrians.append(FreshPondPedestrian(entrance, distance, start_time, velocity, self.distance_around))
-
         start_times = list(random_times(self.start_time, self.stop_time, self.entrance_rate_func))
         n_pedestrians = len(start_times)
         entrances = random.choices(population=self.entrances, weights=self.entrance_weights, k=n_pedestrians)
-        velocities = self.rand_velocity(n_pedestrians)
+        velocities, distances = self.rand_velocities_and_distances(n_pedestrians).T
+        for start_time, entrance, velocity, dist in zip(start_times, entrances, velocities, distances):
+            assert dist > 0
+            original_exit = entrance + dist * sign(velocity)
+            corrected_exit = self._closest_exit(original_exit)
+            corrected_dist = abs(corrected_exit - entrance)
 
-        for start_time, entrance, velocity in zip(start_times, entrances, velocities):
-            proposed_distance = self.rand_distance_prop() * self.distance_around
-            closest_exit = min(self.entrances, key=lambda x: abs(circular_difference(proposed_distance % self.distance_around, x, self.distance_around)))
-            diff = circular_difference(proposed_distance % self.distance_around, closest_exit, self.distance_around)
-            distance = proposed_distance - diff
-            if math.isclose(distance, 0, abs_tol=1e-10):
-                distance = self.distance_around
-            self.pedestrians.append(FreshPondPedestrian(entrance, distance, start_time, velocity, self.distance_around))
+            if math.isclose(corrected_dist, 0, abs_tol=1e-10):
+                corrected_dist = self.dist_around
+                corrected_exit = entrance + sign(velocity) * corrected_dist
+            # print(f"dist: {dist}, corrected_dist: {corrected_dist}")
+            
+            p = FreshPondPedestrian(entrance, corrected_dist, start_time, velocity, self.dist_around)
+            
+
+            final_pos = p.get_position(p.end_time)
+            dist_to_final_pos = self._abs_distance_from(final_pos)
+            closest_exit = min(self.entrances, key=dist_to_final_pos)
+            assert math.isclose(dist_to_final_pos(closest_exit), 0, abs_tol=1e-10)
+
+            initial_pos = p.get_position(p.start_time)
+            dist_to_initial_pos = self._abs_distance_from(initial_pos)
+            closest_exit = min(self.entrances, key=dist_to_initial_pos)
+            assert math.isclose(dist_to_initial_pos(closest_exit), 0, abs_tol=1e-10)
+
+            assert self._distance(initial_pos, entrance) == 0
+            assert math.isclose(self._distance(corrected_exit, final_pos), 0, abs_tol=1e-10)
+
+            assert math.isclose((p.start_pos + p.travel_distance * sign(p.velocity)) - corrected_exit, 0, abs_tol=1e-10)
+            
+
+            self.pedestrians.append(p)
 
 
 
