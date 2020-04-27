@@ -71,23 +71,27 @@ class FreshPondPedestrian:
             raise ValueError("Specify either velocity or time_delta")
 
     def is_in_range(self, t):  
-        return self.start_time <= t <= self.end_time
+        """Returns whether t is in the time range of this pedestrian
+        The time range is a half open interval"""
+        return self.start_time <= t < self.end_time
 
     def get_position(self, t):
         if t is None:
             return None
-        if not (self.is_in_range(t) or math.isclose(t, self.start_time) or math.isclose(t, self.end_time)):
+        if not (self.is_in_range(t) or math.isclose(t, self.start_time)):
             return None
         return (self.start_pos + (t - self.start_time) * self.velocity) % self.distance_around
 
     def first_intersection_time(self, other):
         """Returns first time when my pos = other pos or None if no such time"""
         assert self.distance_around == other.distance_around
-        if self.end_time < other.start_time or self.start_time > other.end_time:
+        if self.end_time <= other.start_time or self.start_time >= other.end_time:
             return None
         if self.velocity == other.velocity:
             return None
+        # an intersection time must be at least min_time
         min_time = max(self.start_time, other.start_time)
+        # an intersection time must be less than max_time
         max_time = min(self.end_time, other.end_time)
 
         x01, t01, v1 = self.start_pos, self.start_time, self.velocity
@@ -98,17 +102,17 @@ class FreshPondPedestrian:
         k2 = (max_time * (v1 - v2) - tmp) / self.distance_around
 
         # try to make k as close to possible to k1
-        # min_time <= t <= max_time --> inequality with k
+        # min_time <= t < max_time --> inequality with k
         if v1 > v2:
-            # k1 <= k <= k2
+            # k1 <= k < k2
             # and try to make k as close to possible to k1
             k = math.ceil(k1)
         else:
-            # k1 >= k >= k2 (the signs flip when solving)
+            # k1 >= k > k2 (the signs flip when solving)
             k = math.floor(k1)
 
         t = (k * self.distance_around + tmp) / (v1 - v2)
-        if t > max_time:
+        if t >= max_time:
             return None
         return t
 
@@ -119,11 +123,13 @@ class FreshPondPedestrian:
         # return self.intersection_time(other) is not None
 
         assert self.distance_around == other.distance_around
-        if self.end_time < other.start_time or self.start_time > other.end_time:
+        if self.end_time <= other.start_time or self.start_time >= other.end_time:
             return False
         if self.velocity == other.velocity:
             return False
+        # an intersection time must be at least min_time
         min_time = max(self.start_time, other.start_time)
+        # an intersection time must be less than max_time
         max_time = min(self.end_time, other.end_time)
 
         x01, t01, v1 = self.start_pos, self.start_time, self.velocity
@@ -135,8 +141,8 @@ class FreshPondPedestrian:
 
         floor_k1 = math.floor(k1)
         floor_k2 = math.floor(k2)
-        # whether there is an integer between k1 and k2 inclusive
-        return floor_k1 != floor_k2 or floor_k1 == k1 or floor_k2 == k2
+        # whether there is an integer in range [k1, k2)
+        return floor_k1 != floor_k2 or floor_k1 == k1
 
     def n_intersections(self, other):
         # TODO

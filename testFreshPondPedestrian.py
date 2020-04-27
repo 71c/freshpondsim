@@ -10,13 +10,13 @@ def assert_isclose(a, b):
 
 
 def assert_intersection_time_expected(distance, args1, args2, expected_time=None):
-    p1 = FreshPondPedestrian(*args1, distance)
-    p2 = FreshPondPedestrian(*args2, distance)
-    assert_isclose(p1.intersection_time(p2), p2.intersection_time(p1))
+    p1 = FreshPondPedestrian(distance, *args1)
+    p2 = FreshPondPedestrian(distance, *args2)
+    assert_isclose(p1.first_intersection_time(p2), p2.first_intersection_time(p1))
     if expected_time is not None:
-        assert_isclose(p2.intersection_time(p1), expected_time)
+        assert_isclose(p2.first_intersection_time(p1), expected_time)
 
-    t = p2.intersection_time(p1)
+    t = p2.first_intersection_time(p1)
     assert_isclose(p2.get_position(t), p1.get_position(t))
 
     assert p1.intersects(p2) == p2.intersects(p1)
@@ -36,13 +36,13 @@ def test_intersection_time():
     assert_intersection_time_expected(4.4, (0.5, 24.2, 1.1, 1), (1.4, 4, -2.1, 1), None)
 
     # test zero velocity
-    assert_intersection_time_expected(4.4, (0.5, 24.2, 1.1, 0), (1.4, 4, -2.1, 1), 1.4)
-    assert_intersection_time_expected(1, (0.5, 24.2, 1.1, 0), (0.3, 4, -2.1, 1))
+    assert_intersection_time_expected(4.4, (0.5, 0, 1.1, None, 100), (1.4, 4, -2.1, 1), 1.4)
+    assert_intersection_time_expected(1, (0.5, 24.2, 1.1, None, 100), (0.3, 4, -2.1, 1))
 
     d = math.pi
     for _ in range(10000):
-        a = (d * random(), d * random() * 2, 5 * random(), 0 if random() < 0.1 else random() * 4 - 2)
-        b = (d * random(), d * random() * 2, 5 * random(), 0 if random() < 0.1 else random() * 4 - 2)
+        a = (d * random(), d * random() * 2, 5 * random(), random() * 4 - 2)
+        b = (d * random(), d * random() * 2, 5 * random(), random() * 4 - 2)
         assert_intersection_time_expected(d, a, b)
 
 

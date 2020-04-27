@@ -307,7 +307,7 @@ def main():
 
             saws.append(n_saw)
 
-    cProfile.runctx('test()', globals(), locals(), sort='cumulative')
+    # cProfile.runctx('test()', globals(), locals(), sort='cumulative')
 
     # print(sim.n_people(-1000))
 
