@@ -19,6 +19,9 @@ def assert_intersection_time_expected(distance, args1, args2, expected_time=None
     t = p2.intersection_time(p1)
     assert_isclose(p2.get_position(t), p1.get_position(t))
 
+    assert p1.intersects(p2) == p2.intersects(p1)
+    assert p2.intersects(p1) == (t is not None)
+
 
 def test_intersection_time():
     assert_intersection_time_expected(6.5, (2.7, 24.18, -1.5, 3.9), (1.2, 10.26, -0.8, 1.9))
@@ -43,9 +46,5 @@ def test_intersection_time():
         assert_intersection_time_expected(d, a, b)
 
 
-
-def main():
-    test_intersection_time()
-
 if __name__ == '__main__':
-    main()
+    test_intersection_time()

@@ -2,3 +2,31 @@ around fresh pond:
 2.46 miles around including around kingsley park
 2.27 miles around not including around kingsley park
 (measured with google maps)
+
+
+
+
+Notes about edge cases for FreshPondPedestrian.__init__
+
+if this is the case then complain:
+travel_distance / abs(velocity) == 0
+travel_distance >= 0, abs(velocity) >= 0
+
+travel_distance / abs(velocity) == 0
+
+if travel_distance == abs(velocity) == 0
+travel no distance and do not move
+time taken can be anything!
+but minimum possible time taken would be 0
+
+if travel_distance == 0 and abs(velocity) != 0
+travel no distance (and do not move because travel no distance)
+travel time can be anything!
+but minimum possible time taken would be 0
+
+if travel_distance != 0 and abs(velocity) == 0
+travel some distance and do not move
+impossible! (or infinite time to get there)
+
+if travel_distance != 0 and abs(velocity) != 0
+normal

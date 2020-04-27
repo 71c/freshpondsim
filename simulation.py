@@ -30,6 +30,7 @@ ENTRANCES_AND_WEIGHTS = [
     (0.42, 0.2), # lusitania field
     (2.3, 0.5) # cambridge water department
 ]
+ENTRANCES, ENTRANCE_WEIGHTS = zip(*ENTRANCES_AND_WEIGHTS)
 
 
 # meters per second
@@ -51,6 +52,9 @@ MAX_IDLE_PROPORTION = 0.8
 IDLE_PROB_GIVEN_NOT_RUN = IDLE_PROB / (1 - RUN_PROB)
 
 MAX_IDLE_TIME = 60 * 4
+
+DAY_LENGTH = 1440
+
 
 def meters_per_second_to_miles_per_minute(x):
     return x / 26.8224
@@ -98,9 +102,16 @@ def rand_velocity(n=None):
 
 def get_double_logistic_day_rate_func(min_λ, max_λ, rise_time, rise_rate, fall_time, fall_rate):
     def f(t):
-        tmp = logistic(t % 1440, rise_time, rise_rate) * logistic(t % 1440, fall_time, -fall_rate)
+        tmp = logistic(t % DAY_LENGTH, rise_time, rise_rate) * logistic(t % DAY_LENGTH, fall_time, -fall_rate)
         return (max_λ - min_λ) * tmp + min_λ
     return f
+
+
+min_λ, max_λ = 0.01, 1.1185034511
+t1, t2 = 8*60, 19*60
+rate1, rate2 = 1/120, 1/120
+
+day_rate_func = get_double_logistic_day_rate_func(min_λ, max_λ, t1, rate1, t2, rate2)
 
 
 def rand_distance_prop():
@@ -220,15 +231,9 @@ def compare_methods_pace_vs_distance():
 
 
 def main():
-    min_λ, max_λ = 0.01, 1.1185034511
-    t1, t2 = 8*60, 19*60
-    rate1, rate2 = 1/120, 1/120
-    λ = get_double_logistic_day_rate_func(min_λ, max_λ, t1, rate1, t2, rate2)
-
-    entrances, entrance_weights = zip(*ENTRANCES_AND_WEIGHTS)
 
     # t = time()
-    sim = FreshPondSim(DISTANCE, 0, 1440, entrances, entrance_weights, λ, rand_velocities_and_distances)
+    sim = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, day_rate_func, rand_velocities_and_distances)
     # print(time() - t)
 
     # print(sim.pedestrians)
@@ -260,16 +265,14 @@ def main():
     # plt.hist(props, bins='auto')
     # plt.show()
 
-    # start_time = 700
-    middle_time = 700
+    start_time = 700
     mile_times = np.linspace(1, 30, 960)
     saws = []
     tic()
     for mile_time in mile_times:
-        start_time = middle_time - mile_time * DISTANCE / 2
-        p = FreshPondPedestrian(0, DISTANCE, start_time, 1/mile_time, DISTANCE)
+        p = FreshPondPedestrian(DISTANCE, 0, DISTANCE, start_time, velocity=1/mile_time)
         end_time = p.end_time
-        n_saw = sim.n_people_saw(p)
+        n_saw = sim.n_unique_people_saw(p)
         n_at_beginning = sim.n_people(start_time)
         n_at_middle = sim.n_people((start_time + end_time) / 2)
         n_at_end = sim.n_people(end_time)
@@ -285,20 +288,19 @@ def main():
         saws.append(n_saw)
     toc()
 
-    plt.plot(mile_times, saws)
-    plt.show()
+    # plt.plot(mile_times, saws)
+    # plt.show()
 
 
 
     def test():
-        middle_time = 700
+        start_time = 700
         mile_times = np.linspace(1, 30, 960)
         saws = []
         for mile_time in mile_times:
-            start_time = middle_time - mile_time * DISTANCE / 2
-            p = FreshPondPedestrian(0, DISTANCE, start_time, 1/mile_time, DISTANCE)
+            p = FreshPondPedestrian(DISTANCE, 0, DISTANCE, start_time, velocity=1/mile_time)
             end_time = p.end_time
-            n_saw = sim.n_people_saw(p)
+            n_saw = sim.n_unique_people_saw(p)
             n_at_beginning = sim.n_people(start_time)
             n_at_middle = sim.n_people((start_time + end_time) / 2)
             n_at_end = sim.n_people(end_time)
@@ -307,13 +309,7 @@ def main():
 
     cProfile.runctx('test()', globals(), locals(), sort='cumulative')
 
-
-
-
-    
-
-
-
+    # print(sim.n_people(-1000))
 
 
 
