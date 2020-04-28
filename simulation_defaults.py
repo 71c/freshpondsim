@@ -147,5 +147,5 @@ def rand_velocities_and_distances(n):
 
 
 def default_sim():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances)
+    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
 

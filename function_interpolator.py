@@ -1,5 +1,9 @@
 from sortedcontainers import SortedDict
 import numpy as np
+import math
+from time import time
+from tictoc import tic, toc
+from collections import deque
 
 
 class UnboundedInterpolator:
@@ -70,7 +74,7 @@ class BoundedInterpolator:
         self._x_max = x_max
 
         # number of gaps between samples
-        n_gaps = int((x_max - x_min) / resolution)
+        n_gaps = math.ceil((x_max - x_min) / resolution)
 
         n_samples = n_gaps + 1
 
@@ -81,13 +85,15 @@ class BoundedInterpolator:
         # can also do this: self._data = [func(u) for u in x]
         # it doesn't really matter which one
         self._data = np.vectorize(func)(x)
-        # self._data = [func(u) for u in x]
 
         # space between two x samples
         self._interval = (x_max - x_min) / n_gaps
 
         # vectorized function so it can take ndarrays
         self._vf = np.vectorize(self._eval)
+
+        print("Before:", resolution)
+        print("After:", self._interval)
 
     def __call__(self, x):
         if type(x) is np.ndarray:
@@ -111,6 +117,87 @@ class BoundedInterpolator:
             rdiff = 1 - ldiff
             return lval * rdiff + rval * ldiff
 
+
+class DynamicBoundedInterpolator:
+    def __init__(self, func, x_min, x_max, resolution, expand_factor=2.0, debug=False):
+        self._func = func
+        self._dx = resolution
+        self._expand_factor = expand_factor
+        self._x1 = x_min
+        self._x2 = x_min
+        # self._data = [self._func(self._x2)]
+        self._data = deque([self._func(self._x2)])
+        self._debug = debug
+        self._expand_right(x_max)
+
+    def _expand_right(self, x_max):
+        """Expands the domain of the function to include at least x_max"""
+
+        if self._debug:
+            print(f"Expanding right, current x2: {self._x2}")
+            t = time()
+
+        n_new_samples = math.ceil((x_max - self._x2) / self._dx)
+        # self._data += [
+        #     self._func(self._x2 + i * self._dx)
+        #     for i in range(1, n_new_samples + 1)
+        # ]
+        self._data.extend([
+            self._func(self._x2 + i * self._dx)
+            for i in range(1, n_new_samples + 1)
+        ])
+        self._x2 = self._x2 + n_new_samples * self._dx
+
+        if self._debug:
+            print(f"new x2: {self._x2}, took {time() - t:.6f} seconds")
+
+    def _expand_left(self, x_min):
+        """Expands the domain of the function to include at least x_min"""
+
+        if self._debug:
+            print(f"Expanding left, current x1: {self._x1}")
+            t = time()
+
+        n_new_samples = math.ceil((self._x1 - x_min) / self._dx)
+        # self._data = [
+        #     self._func(self._x1 - i * self._dx)
+        #     for i in range(n_new_samples, 0, -1)
+        # ] + self._data
+        self._data.extendleft([
+            self._func(self._x1 - i * self._dx)
+            for i in range(1, n_new_samples + 1)
+        ])
+        self._x1 = self._x1 - n_new_samples * self._dx
+
+        if self._debug:
+            print(f"new x1: {self._x1}, took {time() - t:.6f} seconds")
+
+    def __call__(self, x):
+        if type(x) is np.ndarray:
+            return self._vf(x)
+        return self._eval(x)
+
+    def _eval(self, x):
+        if x < self._x1:
+            new_x1 = self._x1 + self._expand_factor * (x - self._x1)
+            self._expand_left(new_x1)
+        elif x > self._x2:
+            new_x2 = self._x2 + self._expand_factor * (x - self._x2)
+            self._expand_right(new_x2)
+
+        pos = (x - self._x1) / self._dx
+        k = int(pos)
+        if k == pos:
+            return self._data[k]
+        else:
+            lval = self._data[k]
+            rval = self._data[k + 1]
+            ldiff = pos - k
+            rdiff = 1 - ldiff
+            return lval * rdiff + rval * ldiff
+
+
+
 if __name__ == '__main__':
     func = lambda x: 2 * x
     intpu = UnboundedInterpolator(func, 1, True)
@@ -130,5 +217,10 @@ if __name__ == '__main__':
     print(7, intpb(7))
     print(3.3, intpb(3.3))
     print(3.33, intpb(3.33))
+
+    intpd = DynamicBoundedInterpolator(func, -20, -20, 1.0)
+    print(intpd(7))
+    print(intpd(7.5))
+    print(intpd(21))
 
     # BoundedInterpolator gives slight round-off errors which is a shame

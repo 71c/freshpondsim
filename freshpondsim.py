@@ -5,7 +5,7 @@ from pynverse import inversefunc
 import scipy.integrate as integrate
 from sortedcontainers import SortedList, SortedDict
 from tictoc import tic, toc
-from function_interpolator import UnboundedInterpolator, BoundedInterpolator
+from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolator
 from scipy.interpolate import interp1d
 import numpy as np
 
@@ -232,12 +232,19 @@ class FreshPondSim:
                 y, abserr = integrate.quad(entrance_rate_func, start_time, t)
                 return y
 
-            interpolation_min = start_time - (end_time - start_time) * 0.1
             # Time periods can go above the interpolation range so give the
             # interpolation function some more space at the end
-            interpolation_max = end_time + (end_time - start_time) * 0.5
+            # interpolation_min = start_time - (end_time - start_time) * 0.1
+            # interpolation_max = end_time + (end_time - start_time) * 0.5
 
-            self.entrance_rate_func_integral = BoundedInterpolator(integral_func, interpolation_min, interpolation_max, interpolate_res)
+            # self.entrance_rate_func_integral = BoundedInterpolator(integral_func, interpolation_min, interpolation_max, interpolate_res)
+            self.entrance_rate_func_integral = DynamicBoundedInterpolator(integral_func, start_time, end_time, interpolate_res)
+
+            # can also interpolate this one! it does make it somewhat fater!
+            # self.entrance_rate_func = BoundedInterpolator(entrance_rate_func, interpolation_min, interpolation_max, interpolate_res)
+            # self.entrance_rate_func = DynamicBoundedInterpolator(entrance_rate_func, start_time, end_time, interpolate_res)
+
+            
 
         else:
             self.entrance_rate_func_integral = None
@@ -284,7 +291,7 @@ class FreshPondSim:
                 if math.isclose(corrected_dist, 0, abs_tol=1e-10):
                     corrected_dist = self.dist_around
                 yield FreshPondPedestrian(self.dist_around, entrance, corrected_dist, start_time, velocity)
-        
+
         self.add_pedestrians(pedestrians_generator())
 
     def clear_pedestrians(self):
