@@ -210,7 +210,7 @@ def sign(x):
 
 
 class FreshPondSim:
-    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func, interpolate=False, interpolate_res=None, interpolate_debug=False):
+    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func, interpolate=False, interpolate_res=None):
         assert_positive_real(distance, 'distance')
         assert_real(start_time, 'start_time')
         assert_real(end_time, 'end_time')
@@ -231,22 +231,12 @@ class FreshPondSim:
             def integral_func(t):
                 y, abserr = integrate.quad(entrance_rate_func, start_time, t)
                 return y
-            
-            # Use unbounded interpolator
-            # self.entrance_rate_func_integral = UnboundedInterpolator(integral_func, interpolate_res, debug=interpolate_debug)
 
-            interpolation_min = start_time
+            interpolation_min = start_time - (end_time - start_time) * 0.1
             # Time periods can go above the interpolation range so give the
             # interpolation function some more space at the end
             interpolation_max = end_time + (end_time - start_time) * 0.5
 
-            # Use scipy interpolator
-            # n_points = math.floor((interpolation_max - interpolation_min) / interpolate_res) + 1
-            # x = np.linspace(interpolation_min, interpolation_max, num=n_points, endpoint=True)
-            # y = np.vectorize(integral_func)(x)
-            # self.entrance_rate_func_integral = interp1d(x, y)
-
-            # Use bounded interpolator
             self.entrance_rate_func_integral = BoundedInterpolator(integral_func, interpolation_min, interpolation_max, interpolate_res)
 
         else:

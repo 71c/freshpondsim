@@ -67,7 +67,7 @@ def test_interpolation():
     toc('FreshPondSim without interpolation init')
 
     tic('FreshPondSim with interpolation init')
-    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=5, interpolate_debug=False)
+    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=3)
     toc('FreshPondSim with interpolation init')
 
     print()
@@ -88,10 +88,10 @@ def test_interpolation():
 
     
     # cProfile.runctx('test_non_interpolation(40)', globals(), locals(), sort='cumulative')
-    cProfile.runctx('test_interpolation(40)', globals(), locals(), sort='tottime')
+    # cProfile.runctx('test_interpolation(40)', globals(), locals(), sort='tottime')
 
-    # test_non_interpolation(10)
-    # test_interpolation(1000)
+    # test_non_interpolation(100)
+    test_interpolation(100)
 
 
 

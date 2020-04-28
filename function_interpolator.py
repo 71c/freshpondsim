@@ -69,12 +69,24 @@ class BoundedInterpolator:
         self._x_min = x_min
         self._x_max = x_max
 
-        self._n_gaps = int((x_max - x_min) / resolution)
-        n_points = self._n_gaps + 1
-        x = np.linspace(x_min, x_max, num=n_points, endpoint=True)
-        self._data = np.vectorize(func)(x)
-        self._interval = (x_max - x_min) / self._n_gaps
+        # number of gaps between samples
+        n_gaps = int((x_max - x_min) / resolution)
 
+        n_samples = n_gaps + 1
+
+        # x samples to evaluate function at
+        x = np.linspace(x_min, x_max, num=n_samples, endpoint=True)
+
+        # y samples to interpolate between
+        # can also do this: self._data = [func(u) for u in x]
+        # it doesn't really matter which one
+        self._data = np.vectorize(func)(x)
+        # self._data = [func(u) for u in x]
+
+        # space between two x samples
+        self._interval = (x_max - x_min) / n_gaps
+
+        # vectorized function so it can take ndarrays
         self._vf = np.vectorize(self._eval)
 
     def __call__(self, x):
@@ -90,8 +102,8 @@ class BoundedInterpolator:
 
         pos = (x - self._x_min) / self._interval
         k = int(pos)
-        if k == self._n_gaps:
-            return self._data[self._n_gaps]
+        if k == pos:
+            return self._data[k]
         else:
             lval = self._data[k]
             rval = self._data[k + 1]
@@ -99,18 +111,24 @@ class BoundedInterpolator:
             rdiff = 1 - ldiff
             return lval * rdiff + rval * ldiff
 
-
 if __name__ == '__main__':
     func = lambda x: 2 * x
-    intp = FunctionInterpolator(func, 1, True)
-    print(intp(3))
-    print(intp(3.1))
-    print(intp(3.2))
-    print(intp(3.5))
-    print(intp(3.4))
-    print(intp(10))
-    print(intp(8))
-    print(intp(9))
-    print(intp(12))
-    print(intp(11))
+    intpu = UnboundedInterpolator(func, 1, True)
+    print(intpu(3))
+    print(intpu(3.1))
+    print(intpu(3.2))
+    print(intpu(3.5))
+    print(intpu(3.4))
+    print(intpu(10))
+    print(intpu(8))
+    print(intpu(9))
+    print(intpu(12))
+    print(intpu(11))
+    print(intpu(3.33))
 
+    intpb = BoundedInterpolator(func, -20, 20, 1.0)
+    print(7, intpb(7))
+    print(3.3, intpb(3.3))
+    print(3.33, intpb(3.33))
+
+    # BoundedInterpolator gives slight round-off errors which is a shame
