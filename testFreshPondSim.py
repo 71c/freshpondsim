@@ -88,11 +88,10 @@ def test_interpolation():
 
     
     # cProfile.runctx('test_non_interpolation(40)', globals(), locals(), sort='cumulative')
-    # cProfile.runctx('test_interpolation(40)', globals(), locals(), sort='cumulative')
+    cProfile.runctx('test_interpolation(40)', globals(), locals(), sort='tottime')
 
-    test_non_interpolation(10)
-    test_interpolation(100)
-
+    # test_non_interpolation(10)
+    # test_interpolation(1000)
 
 
 

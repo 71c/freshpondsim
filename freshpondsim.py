@@ -5,7 +5,9 @@ from pynverse import inversefunc
 import scipy.integrate as integrate
 from sortedcontainers import SortedList, SortedDict
 from tictoc import tic, toc
-from function_interpolator import FunctionInterpolator
+from function_interpolator import UnboundedInterpolator, BoundedInterpolator
+from scipy.interpolate import interp1d
+import numpy as np
 
 
 def is_real(x):
@@ -229,7 +231,24 @@ class FreshPondSim:
             def integral_func(t):
                 y, abserr = integrate.quad(entrance_rate_func, start_time, t)
                 return y
-            self.entrance_rate_func_integral = FunctionInterpolator(integral_func, interpolate_res, debug=interpolate_debug)
+            
+            # Use unbounded interpolator
+            # self.entrance_rate_func_integral = UnboundedInterpolator(integral_func, interpolate_res, debug=interpolate_debug)
+
+            interpolation_min = start_time
+            # Time periods can go above the interpolation range so give the
+            # interpolation function some more space at the end
+            interpolation_max = end_time + (end_time - start_time) * 0.5
+
+            # Use scipy interpolator
+            # n_points = math.floor((interpolation_max - interpolation_min) / interpolate_res) + 1
+            # x = np.linspace(interpolation_min, interpolation_max, num=n_points, endpoint=True)
+            # y = np.vectorize(integral_func)(x)
+            # self.entrance_rate_func_integral = interp1d(x, y)
+
+            # Use bounded interpolator
+            self.entrance_rate_func_integral = BoundedInterpolator(integral_func, interpolation_min, interpolation_max, interpolate_res)
+
         else:
             self.entrance_rate_func_integral = None
 

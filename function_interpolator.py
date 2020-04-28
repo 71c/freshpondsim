@@ -2,7 +2,11 @@ from sortedcontainers import SortedDict
 import numpy as np
 
 
-class FunctionInterpolator:
+class UnboundedInterpolator:
+    """Class that can linearly interpolate through a function that is costly
+    to compute, on the go, with no need to specify bounds or pre-compute
+    It is costly to do the binary search though so I would recommend using
+    BoundedInterpolator instead."""
     def __init__(self, func, resolution, debug=False):
         self._func = func
         self._resolution = resolution
@@ -11,6 +15,12 @@ class FunctionInterpolator:
         self._debug = debug
         # vectorized function so it can take ndarrays
         self._vf = np.vectorize(self._eval)
+
+    def min_val(self):
+        return self._keys[0]
+
+    def max_val(self):
+        return self._keys[-1]
 
     def __call__(self, x):
         if type(x) is np.ndarray:
@@ -23,7 +33,7 @@ class FunctionInterpolator:
 
         # if there are <= 1 data points or if x is less than or greater than all
         # existing keys, always compute the value
-        if len(self._data) <= 1 or x < self._keys[0] or x > self._keys[-1]:
+        if len(self._data) <= 1 or x < self.min_val() or x > self.max_val():
             if self._debug:
                 print("Computing value of function because not enough data or"
                       " bigger or smaller than all other keys")
@@ -52,6 +62,42 @@ class FunctionInterpolator:
             lval = self._data[self._keys[left_index]]
             rval = self._data[self._keys[right_index]]
             return (lval * rdiff + rval * ldiff) / (ldiff + rdiff)
+
+
+class BoundedInterpolator:
+    def __init__(self, func, x_min, x_max, resolution):
+        self._x_min = x_min
+        self._x_max = x_max
+
+        self._n_gaps = int((x_max - x_min) / resolution)
+        n_points = self._n_gaps + 1
+        x = np.linspace(x_min, x_max, num=n_points, endpoint=True)
+        self._data = np.vectorize(func)(x)
+        self._interval = (x_max - x_min) / self._n_gaps
+
+        self._vf = np.vectorize(self._eval)
+
+    def __call__(self, x):
+        if type(x) is np.ndarray:
+            return self._vf(x)
+        return self._eval(x)
+
+    def _eval(self, x):
+        if x < self._x_min:
+            raise ValueError("A value is below the interpolation range.")
+        if x > self._x_max:
+            raise ValueError("A value is above the interpolation range.")
+
+        pos = (x - self._x_min) / self._interval
+        k = int(pos)
+        if k == self._n_gaps:
+            return self._data[self._n_gaps]
+        else:
+            lval = self._data[k]
+            rval = self._data[k + 1]
+            ldiff = pos - k
+            rdiff = 1 - ldiff
+            return lval * rdiff + rval * ldiff
 
 
 if __name__ == '__main__':
