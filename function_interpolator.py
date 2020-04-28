@@ -125,7 +125,6 @@ class DynamicBoundedInterpolator:
         self._expand_factor = expand_factor
         self._x1 = x_min
         self._x2 = x_min
-        # self._data = [self._func(self._x2)]
         self._data = deque([self._func(self._x2)])
         self._debug = debug
         self._expand_right(x_max)
@@ -138,10 +137,6 @@ class DynamicBoundedInterpolator:
             t = time()
 
         n_new_samples = math.ceil((x_max - self._x2) / self._dx)
-        # self._data += [
-        #     self._func(self._x2 + i * self._dx)
-        #     for i in range(1, n_new_samples + 1)
-        # ]
         self._data.extend([
             self._func(self._x2 + i * self._dx)
             for i in range(1, n_new_samples + 1)
@@ -159,10 +154,6 @@ class DynamicBoundedInterpolator:
             t = time()
 
         n_new_samples = math.ceil((self._x1 - x_min) / self._dx)
-        # self._data = [
-        #     self._func(self._x1 - i * self._dx)
-        #     for i in range(n_new_samples, 0, -1)
-        # ] + self._data
         self._data.extendleft([
             self._func(self._x1 - i * self._dx)
             for i in range(1, n_new_samples + 1)
@@ -178,10 +169,10 @@ class DynamicBoundedInterpolator:
         return self._eval(x)
 
     def _eval(self, x):
-        if x < self._x1:
+        if x <= self._x1:
             new_x1 = self._x1 + self._expand_factor * (x - self._x1)
             self._expand_left(new_x1)
-        elif x > self._x2:
+        elif x >= self._x2:
             new_x2 = self._x2 + self._expand_factor * (x - self._x2)
             self._expand_right(new_x2)
 
@@ -189,14 +180,14 @@ class DynamicBoundedInterpolator:
         k = int(pos)
         if k == pos:
             return self._data[k]
+        elif k == len(self._data) - 1: # edge-case
+            return self._data[k] # technically this is not accurate
         else:
             lval = self._data[k]
             rval = self._data[k + 1]
             ldiff = pos - k
             rdiff = 1 - ldiff
             return lval * rdiff + rval * ldiff
-
-
 
 if __name__ == '__main__':
     func = lambda x: 2 * x
