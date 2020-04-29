@@ -75,14 +75,14 @@ def test_interpolation():
     def test_non_interpolation(n):
         for i in range(n):
             tic(f'FreshPondSim without interpolation reset {i+1}')
-            sim1.set_random_pedestrians()
+            sim1.refresh_pedestrians()
             toc(f'FreshPondSim without interpolation reset {i+1}')
         print()
 
     def test_interpolation(n):
         for i in range(n):
             tic(f'FreshPondSim with interpolation reset {i+1}')
-            sim2.set_random_pedestrians()
+            sim2.refresh_pedestrians()
             toc(f'FreshPondSim with interpolation reset {i+1}')
         print()
 
@@ -100,12 +100,3 @@ if __name__ == '__main__':
     # test_add_pedestrians()
 
     test_interpolation()
-
-
-
-    # p = FreshPondPedestrian(1, 0, 0, 0, time_delta=10)
-    # print(p)
-
-    # p = FreshPondPedestrian(DISTANCE, 0, DISTANCE, 0, time_delta=0)
-
-    # p = FreshPondPedestrian(distance_around=DISTANCE, start_pos=0, travel_distance=0, start_time=0, time_delta=math.inf)

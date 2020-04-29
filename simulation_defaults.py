@@ -28,9 +28,21 @@ ENTRANCES_AND_WEIGHTS = [
 ENTRANCES, ENTRANCE_WEIGHTS = zip(*ENTRANCES_AND_WEIGHTS)
 
 
-# meters per second
-WALK_SPEED_MEAN = 1.26
-WALK_SPEED_STD = 0.09636914420286412
+## Normalize distance or set to a desired value to make it easier to see trends
+ENTRANCES = np.array(ENTRANCES) / DISTANCE
+ENTRANCE_WEIGHTS = np.array(ENTRANCE_WEIGHTS) / DISTANCE
+DISTANCE = 1
+ENTRANCES *= DISTANCE
+ENTRANCE_WEIGHTS *= DISTANCE
+
+## Only one entrance -- to simplify further
+ENTRANCES = ENTRANCES[0:1]
+ENTRANCE_WEIGHTS = ENTRANCE_WEIGHTS[0:1]
+
+
+# miles per minute
+WALK_SPEED_MEAN = 0.04697566213
+WALK_SPEED_STD = 0.003592860602
 
 RUN_SPEED_MU = 6.47987998337011
 RUN_SPEED_SIGMA = 0.2730453477555863
@@ -43,10 +55,6 @@ MAX_IDLE_PROPORTION = 0.8
 MAX_IDLE_TIME = 60 * 4
 
 DAY_LENGTH = 1440
-
-
-def _meters_per_second_to_miles_per_minute(x):
-    return x / 26.8224
 
 
 def get_double_logistic_day_rate_func(min_λ, max_λ, rise_time, rise_rate, fall_time, fall_rate):
@@ -64,6 +72,8 @@ def _get_default_day_rate_func():
 
 
 default_day_rate_func = _get_default_day_rate_func()
+
+constant_day_rate_func = lambda x: 1
 
 
 def _rand_distance_prop():
@@ -93,10 +103,8 @@ def rand_walk_velocities_and_distances(n):
     a, b, c = 0.395, 1.1, 1.0
     idle_probs = a * np.exp(-(dist_props / b)**c)
 
-    # random walking speeds in meters per second
+    # random walking speeds in miles per minute
     speeds = np.random.normal(loc=WALK_SPEED_MEAN, scale=WALK_SPEED_STD, size=n)
-    # convert to miles per minute
-    speeds = _meters_per_second_to_miles_per_minute(speeds)
 
     # 'idle' means pepole who are stationary for some proportion of the time,
     # meaning who do a mix of walking and sitting/staying
@@ -124,7 +132,7 @@ def rand_walk_velocities_and_distances(n):
 def rand_run_speed(n=None):
     """returns random walking velocity in miles per minute, can be negative"""
     mile_time_secs = lognorm.rvs(RUN_SPEED_SIGMA, loc=0, scale=RUN_SPEED_SCALE, size=n)
-    return np.random.choice([-1, 1], n) * 1 / (mile_time_secs / 60)
+    return np.random.choice([-1, 1], n) * 60 / mile_time_secs
 
 
 def rand_run_velocities_and_distances(n):
@@ -134,7 +142,7 @@ def rand_run_velocities_and_distances(n):
     return np.stack((speeds, dists)).T
 
 
-def rand_velocities_and_distances(n):
+def default_rand_velocities_and_distances(n):
     n_runs = np.random.binomial(n, RUN_PROB)
     n_walks = n - n_runs
 
@@ -146,6 +154,26 @@ def rand_velocities_and_distances(n):
     return together
 
 
+def constant_velocity_rand_velocities_and_distances(n):
+    # exactly 20 min/mi for easy spotting
+    velocities = np.random.choice([-1, 1], n) * (1 / 20)
+    # dists = np.array([DISTANCE * _rand_distance_prop() for _ in range(n)])
+    dists = np.array([1 * DISTANCE for _ in range(n)])
+    return np.stack((velocities, dists)).T
+
+
 def default_sim():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, default_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+
+
+def sim_constant_rate():
+    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, constant_day_rate_func, default_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+
+
+def sim_constant_speed():
+    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, constant_velocity_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+
+
+def sim_constant_rate_and_speed():
+    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, constant_day_rate_func, constant_velocity_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
 

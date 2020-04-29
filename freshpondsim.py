@@ -3,7 +3,7 @@ import math
 from numbers import Real
 from pynverse import inversefunc
 import scipy.integrate as integrate
-from sortedcontainers import SortedList, SortedDict
+from sortedcontainers import SortedList, SortedKeyList, SortedDict
 from tictoc import tic, toc
 from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolator
 from scipy.interpolate import interp1d
@@ -147,6 +147,15 @@ class FreshPondPedestrian:
         # whether there is an integer in range [k1, k2)
         return floor_k1 != floor_k2 or floor_k1 == k1
 
+    def intersection_direction(self, other):
+        """Returns 1 if self intersects other going in the same direction,
+        -1 if self intersects other going in the opposite direction, or
+        0 if self does not intersect other"""
+        if self.intersects(other):
+            return -1 if (self.velocity > 0) != (other.velocity > 0) else 1
+        else:
+            return 0
+
     def n_intersections(self, other):
         # TODO
         pass
@@ -232,26 +241,16 @@ class FreshPondSim:
                 y, abserr = integrate.quad(entrance_rate_func, start_time, t)
                 return y
 
-            # Time periods can go above the interpolation range so give the
-            # interpolation function some more space at the end
-            # interpolation_min = start_time - (end_time - start_time) * 0.1
-            # interpolation_max = end_time + (end_time - start_time) * 0.5
-
-            # self.entrance_rate_func_integral = BoundedInterpolator(integral_func, interpolation_min, interpolation_max, interpolate_res)
             self.entrance_rate_func_integral = DynamicBoundedInterpolator(integral_func, start_time, end_time, interpolate_res)
 
             # can also interpolate this one! it does make it somewhat fater!
-            # self.entrance_rate_func = BoundedInterpolator(entrance_rate_func, interpolation_min, interpolation_max, interpolate_res)
-            # self.entrance_rate_func = DynamicBoundedInterpolator(entrance_rate_func, start_time, end_time, interpolate_res)
-
-            
-
+            self.entrance_rate_func = DynamicBoundedInterpolator(entrance_rate_func, start_time, end_time, interpolate_res)
         else:
             self.entrance_rate_func_integral = None
 
-        self.pedestrians = SortedList(key=lambda p: p.start_time)
+        self.pedestrians = SortedKeyList(key=lambda p: p.start_time)
         self._counts = SortedDict()
-        self.set_random_pedestrians()
+        self.refresh_pedestrians()
 
     def _distance(self, a, b):
         """signed distance of a relative to b"""
@@ -273,7 +272,7 @@ class FreshPondSim:
         corrected_dist = dist + diff
         return corrected_dist
 
-    def set_random_pedestrians(self):
+    def refresh_pedestrians(self):
         """Refreshes the pedestrians in the simulation to random ones"""
         self.clear_pedestrians()
         
@@ -399,6 +398,18 @@ class FreshPondSim:
             if p.intersects(q):
                 n += 1
         return n
+
+    def intersection_directions(self, p):
+        """Returns the number of people seen going in the same direction and the
+        number of people seen going in the opposite direction by p as a tuple"""
+        n_same, n_diff = 0, 0
+        for q in self.pedestrians:
+            d = q.intersection_direction(p)
+            if d == 1:
+                n_same += 1
+            elif d == -1:
+                n_diff += 1
+        return n_same, n_diff
 
     def n_people(self, t):
         """Returns the number of people at a given time"""

@@ -2,6 +2,7 @@ from freshpondsim import FreshPondPedestrian
 from math import isclose
 import math
 from random import random
+from simulation_defaults import DISTANCE
 
 
 def assert_isclose(a, b):
@@ -21,6 +22,8 @@ def assert_intersection_time_expected(distance, args1, args2, expected_time=None
 
     assert p1.intersects(p2) == p2.intersects(p1)
     assert p2.intersects(p1) == (t is not None)
+
+    assert p1.intersection_direction(p2) == p2.intersection_direction(p1)
 
 
 def test_intersection_time():
@@ -53,6 +56,11 @@ def test_init_edge_cases():
     except ValueError as e:
         print("Error message:", e)
 
+    print("Trying to make infinite velocity pedestrian.")
+    try:
+        p = FreshPondPedestrian(DISTANCE, 0, DISTANCE, start_time=0, time_delta=0)
+    except ValueError as e:
+        print("Error message:", e)
 
 if __name__ == '__main__':
     test_intersection_time()

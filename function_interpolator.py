@@ -129,6 +129,9 @@ class DynamicBoundedInterpolator:
         self._debug = debug
         self._expand_right(x_max)
 
+        # vectorized function so it can take ndarrays
+        self._vf = np.vectorize(self._eval)
+
     def _expand_right(self, x_max):
         """Expands the domain of the function to include at least x_max"""
 
