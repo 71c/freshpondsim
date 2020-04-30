@@ -18,27 +18,25 @@ DISTANCE = 2.46
 
 # counter-clockwise
 ENTRANCES_AND_WEIGHTS = [
-    (0, 0.7), # vassal ln
-    (0.15, 0.5), # concord ave
-    (0.2, 0.4), # lusitania field
-    (0.39, 0.4), # lusitania field
-    (0.42, 0.2), # lusitania field
-    (2.3, 0.5) # cambridge water department
+    (0, 0.7),  # vassal ln
+    (0.15, 0.5),  # concord ave
+    (0.2, 0.4),  # lusitania field
+    (0.39, 0.4),  # lusitania field
+    (0.42, 0.2),  # lusitania field
+    (2.3, 0.5)  # cambridge water department
 ]
 ENTRANCES, ENTRANCE_WEIGHTS = zip(*ENTRANCES_AND_WEIGHTS)
 
-
 ## Normalize distance or set to a desired value to make it easier to see trends
-ENTRANCES = np.array(ENTRANCES) / DISTANCE
-ENTRANCE_WEIGHTS = np.array(ENTRANCE_WEIGHTS) / DISTANCE
-DISTANCE = 1
-ENTRANCES *= DISTANCE
-ENTRANCE_WEIGHTS *= DISTANCE
+# ENTRANCES = np.array(ENTRANCES) / DISTANCE
+# ENTRANCE_WEIGHTS = np.array(ENTRANCE_WEIGHTS) / DISTANCE
+# DISTANCE = 1
+# ENTRANCES *= DISTANCE
+# ENTRANCE_WEIGHTS *= DISTANCE
 
 ## Only one entrance -- to simplify further
-ENTRANCES = ENTRANCES[0:1]
-ENTRANCE_WEIGHTS = ENTRANCE_WEIGHTS[0:1]
-
+# ENTRANCES = ENTRANCES[0:1]
+# ENTRANCE_WEIGHTS = ENTRANCE_WEIGHTS[0:1]
 
 # miles per minute
 WALK_SPEED_MEAN = 0.04697566213
@@ -48,7 +46,7 @@ RUN_SPEED_MU = 6.47987998337011
 RUN_SPEED_SIGMA = 0.2730453477555863
 RUN_SPEED_SCALE = np.exp(RUN_SPEED_MU)
 
-RUN_PROB = 0.2 # proportion of people who run
+RUN_PROB = 0.2  # proportion of people who run
 MIN_IDLE_PROPORTION = 0.2
 MAX_IDLE_PROPORTION = 0.8
 
@@ -57,17 +55,20 @@ MAX_IDLE_TIME = 60 * 4
 DAY_LENGTH = 1440
 
 
-def get_double_logistic_day_rate_func(min_λ, max_λ, rise_time, rise_rate, fall_time, fall_rate):
+def get_double_logistic_day_rate_func(min_λ, max_λ, rise_time, rise_rate,
+                                      fall_time, fall_rate):
     def f(t):
-        tmp = _logistic(t % DAY_LENGTH, rise_time, rise_rate) * _logistic(t % DAY_LENGTH, fall_time, -fall_rate)
+        tmp = _logistic(t % DAY_LENGTH, rise_time, rise_rate) * _logistic(
+            t % DAY_LENGTH, fall_time, -fall_rate)
         return (max_λ - min_λ) * tmp + min_λ
+
     return f
 
 
 def _get_default_day_rate_func():
     min_λ, max_λ = 0.01, 1.1185034511
-    t1, t2 = 8*60, 19*60
-    rate1, rate2 = 1/120, 1/120
+    t1, t2 = 8 * 60, 19 * 60
+    rate1, rate2 = 1 / 120, 1 / 120
     return get_double_logistic_day_rate_func(min_λ, max_λ, t1, rate1, t2, rate2)
 
 
@@ -111,15 +112,17 @@ def rand_walk_velocities_and_distances(n):
     # this is roughly approximated by "walking" very slowly
 
     # get random idle proportions
-    idle_proportions = np.random.uniform(MIN_IDLE_PROPORTION, MAX_IDLE_PROPORTION, n)
+    idle_proportions = np.random.uniform(MIN_IDLE_PROPORTION,
+                                         MAX_IDLE_PROPORTION, n)
     # make some of them 0
     idle_proportions[np.random.random(n) > idle_probs] = 0
-    
+
     # maximum idle proportions such that the time idle <= MAX_IDLE_TIME
     max_idle_proportions = 1 / (1 + dists / (MAX_IDLE_TIME * speeds))
     # constrain idle_proportions so that the times idle are not too long
     # idle_proportions = np.minimum(idle_proportions, max_idle_proportions)
-    idle_proportions = _soft_minimum_positive(idle_proportions, max_idle_proportions, 0.1)
+    idle_proportions = _soft_minimum_positive(idle_proportions,
+                                              max_idle_proportions, 0.1)
 
     speeds = speeds * (1 - idle_proportions)
 
@@ -131,7 +134,10 @@ def rand_walk_velocities_and_distances(n):
 
 def rand_run_speed(n=None):
     """returns random walking velocity in miles per minute, can be negative"""
-    mile_time_secs = lognorm.rvs(RUN_SPEED_SIGMA, loc=0, scale=RUN_SPEED_SCALE, size=n)
+    mile_time_secs = lognorm.rvs(RUN_SPEED_SIGMA,
+                                 loc=0,
+                                 scale=RUN_SPEED_SCALE,
+                                 size=n)
     return np.random.choice([-1, 1], n) * 60 / mile_time_secs
 
 
@@ -163,17 +169,54 @@ def constant_velocity_rand_velocities_and_distances(n):
 
 
 def default_sim():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, default_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+    return FreshPondSim(DISTANCE,
+                        0,
+                        DAY_LENGTH,
+                        ENTRANCES,
+                        ENTRANCE_WEIGHTS,
+                        default_rand_velocities_and_distances,
+                        default_day_rate_func,
+                        interpolate_rate=True,
+                        interpolate_rate_integral=True,
+                        interpolate_res=2.0)
 
 
-def sim_constant_rate():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, constant_day_rate_func, default_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+## The next 3 functions are now obsolete
 
-
-def sim_constant_speed():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, constant_velocity_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
+# def sim_constant_rate():
+#     return FreshPondSim(DISTANCE,
+#                         0,
+#                         DAY_LENGTH,
+#                         ENTRANCES,
+#                         ENTRANCE_WEIGHTS,
+#                         default_rand_velocities_and_distances,
+#                         rate_func=constant_day_rate_func,
+#                         interpolate_rate=True,
+#                         interpolate_rate_integral=True,
+#                         interpolate_res=2.0)
+#
+#
+# def sim_constant_speed():
+#     return FreshPondSim(DISTANCE,
+#                         0,
+#                         DAY_LENGTH,
+#                         ENTRANCES,
+#                         ENTRANCE_WEIGHTS,
+#                         constant_velocity_rand_velocities_and_distances,
+#                         default_day_rate_func,
+#                         interpolate_rate=True,
+#                         interpolate_rate_integral=True,
+#                         interpolate_res=2.0)
 
 
 def sim_constant_rate_and_speed():
-    return FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, constant_day_rate_func, constant_velocity_rand_velocities_and_distances, interpolate=True, interpolate_res=1.0)
-
+    return FreshPondSim(DISTANCE,
+                        0,
+                        DAY_LENGTH,
+                        ENTRANCES,
+                        ENTRANCE_WEIGHTS,
+                        constant_velocity_rand_velocities_and_distances,
+                        constant_day_rate_func,
+                        interpolate_rate=True,
+                        interpolate_rate_integral=True,
+                        interpolate_res=2.0)

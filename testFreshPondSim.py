@@ -63,11 +63,11 @@ def test_add_pedestrians():
 
 def test_interpolation():
     tic('FreshPondSim without interpolation init')
-    sim1 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=False)
+    sim1 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, rand_velocities_and_distances, default_day_rate_func, interpolate_rate=False, interpolate_rate_integral=False)
     toc('FreshPondSim without interpolation init')
 
     tic('FreshPondSim with interpolation init')
-    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_day_rate_func, rand_velocities_and_distances, interpolate=True, interpolate_res=2.483)
+    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, rand_velocities_and_distances, default_day_rate_func, interpolate_rate=True, interpolate_rate_integral=True, interpolate_res=2.483)
     toc('FreshPondSim with interpolation init')
 
     print()
@@ -86,7 +86,7 @@ def test_interpolation():
             toc(f'FreshPondSim with interpolation reset {i+1}')
         print()
 
-    
+
     # cProfile.runctx('test_non_interpolation(40)', globals(), locals(), sort='cumulative')
     # cProfile.runctx('test_interpolation(120)', globals(), locals(), sort='tottime')
 

@@ -21,16 +21,24 @@ def assert_real(val, name):
 
 def assert_nonnegative_real(val, name):
     if not (is_real(val) and val >= 0):
-        raise ValueError(f"{name} should be a number in range [0, inf) but is {val}")
+        raise ValueError(
+            f"{name} should be a number in range [0, inf) but is {val}")
 
 
 def assert_positive_real(val, name):
     if not (is_real(val) and val > 0):
-        raise ValueError(f"{name} should be a number in range (0, inf) but is {val}")
+        raise ValueError(
+            f"{name} should be a number in range (0, inf) but is {val}")
 
 
 class FreshPondPedestrian:
-    def __init__(self, distance_around, start_pos, travel_distance, start_time, velocity=None, time_delta=None):
+    def __init__(self,
+                 distance_around,
+                 start_pos,
+                 travel_distance,
+                 start_time,
+                 velocity=None,
+                 time_delta=None):
         """
         distance_around: distance around the path in miles
         start_pos: starting position in miles
@@ -45,12 +53,14 @@ class FreshPondPedestrian:
         """
         assert_positive_real(distance_around, 'distance_around')
         if not (is_real(start_pos) and 0 <= start_pos <= distance_around):
-            raise ValueError(f"start_pos {start_pos} is not a number in range [0, distance_around]")
+            raise ValueError(
+                f"start_pos {start_pos} is not a number in range [0, distance_around]"
+            )
         assert_real(start_time, 'start_time')
 
         self.distance_around = distance_around
         self.start_pos = start_pos
-        self.travel_distance = abs(travel_distance) # not necessary to have
+        self.travel_distance = abs(travel_distance)  # not necessary to have
         self.start_time = start_time
 
         if velocity is not None and time_delta is not None:
@@ -59,7 +69,9 @@ class FreshPondPedestrian:
             assert_nonnegative_real(travel_distance, 'travel_distance')
             assert_real(velocity, 'velocity')
             if travel_distance == 0:
-                raise ValueError("Travel distance cannot be zero if specifying velocity. Specify time_delta instead.")
+                raise ValueError(
+                    "Travel distance cannot be zero if specifying velocity. Specify time_delta instead."
+                )
             # travel_distance != 0
             if velocity == 0:
                 raise ValueError("Velocity cannot be zero")
@@ -73,7 +85,7 @@ class FreshPondPedestrian:
         else:
             raise ValueError("Specify either velocity or time_delta")
 
-    def is_in_range(self, t):  
+    def is_in_range(self, t):
         """Returns whether t is in the time range of this pedestrian
         The time range is a half open interval"""
         return self.start_time <= t < self.end_time
@@ -83,7 +95,8 @@ class FreshPondPedestrian:
             return None
         if not (self.is_in_range(t) or math.isclose(t, self.start_time)):
             return None
-        return (self.start_pos + (t - self.start_time) * self.velocity) % self.distance_around
+        return (self.start_pos +
+                (t - self.start_time) * self.velocity) % self.distance_around
 
     def first_intersection_time(self, other):
         """Returns first time when my pos = other pos or None if no such time"""
@@ -100,7 +113,7 @@ class FreshPondPedestrian:
         x01, t01, v1 = self.start_pos, self.start_time, self.velocity
         x02, t02, v2 = other.start_pos, other.start_time, other.velocity
 
-        tmp = t01*v1 - t02*v2 + x02 - x01
+        tmp = t01 * v1 - t02 * v2 + x02 - x01
         k1 = (min_time * (v1 - v2) - tmp) / self.distance_around
         k2 = (max_time * (v1 - v2) - tmp) / self.distance_around
 
@@ -122,9 +135,6 @@ class FreshPondPedestrian:
     def intersects(self, other):
         """Returns whether self ever crosses other's path"""
 
-        # can also do this but it is slower
-        # return self.intersection_time(other) is not None
-
         assert self.distance_around == other.distance_around
         if self.end_time <= other.start_time or self.start_time >= other.end_time:
             return False
@@ -138,7 +148,7 @@ class FreshPondPedestrian:
         x01, t01, v1 = self.start_pos, self.start_time, self.velocity
         x02, t02, v2 = other.start_pos, other.start_time, other.velocity
 
-        tmp = t01*v1 - t02*v2 + x02 - x01
+        tmp = t01 * v1 - t02 * v2 + x02 - x01
         k1 = (min_time * (v1 - v2) - tmp) / self.distance_around
         k2 = (max_time * (v1 - v2) - tmp) / self.distance_around
 
@@ -156,15 +166,56 @@ class FreshPondPedestrian:
         else:
             return 0
 
+    def total_intersection_direction(self, other):
+        """Returns the total signed intersections of self between other
+        where -1 would be self and other intersecting in opposite directions and
+        1 would be self and other intersecting in the same direction"""
+        n_intersections = self.n_intersections(other)
+        if (self.velocity > 0) != (other.velocity > 0):
+            n_intersections *= -1
+        return n_intersections
+
     def n_intersections(self, other):
-        # TODO
-        pass
+        """Returns the number of intersections of self and other"""
+        assert self.distance_around == other.distance_around
+        if self.end_time <= other.start_time or self.start_time >= other.end_time:
+            return False
+        if self.velocity == other.velocity:
+            return False
+        # an intersection time must be at least min_time
+        min_time = max(self.start_time, other.start_time)
+        # an intersection time must be less than max_time
+        max_time = min(self.end_time, other.end_time)
+
+        x01, t01, v1 = self.start_pos, self.start_time, self.velocity
+        x02, t02, v2 = other.start_pos, other.start_time, other.velocity
+
+        tmp = t01 * v1 - t02 * v2 + x02 - x01
+        k1 = (min_time * (v1 - v2) - tmp) / self.distance_around
+        k2 = (max_time * (v1 - v2) - tmp) / self.distance_around
+
+        # make it so that a <= b
+        if k1 <= k2:
+            a, b = k1, k2
+        else:
+            a, b = k2, k1
+
+        # number of integers in the range (a, b)
+        n_integers_between = max(0, math.ceil(b) - math.floor(a) - 1)
+
+        # number of integers in the range [k1, k2) or (k2, k1]
+        if k1 == math.floor(k1):
+            n_integers_between += 1
+
+        return n_integers_between
 
     def get_mile_time(self):
         return math.inf if self.velocity == 0 else 1 / self.velocity
 
     def __repr__(self):
-        return(f'FreshPondPedestrian(start_time={self.start_time:.2f}, end_time={self.end_time:.2f}, start_pos={self.start_pos}, mile_time={self.get_mile_time():.2f})')
+        return (
+            f'FreshPondPedestrian(start_time={self.start_time:.2f}, end_time={self.end_time:.2f}, start_pos={self.start_pos}, mile_time={self.get_mile_time():.2f})'
+        )
 
 
 def newtons_method(x0, func, d_func, tol, max_iter):
@@ -181,11 +232,13 @@ def rand_next_time(t0, λfunc, λfunc_integral=None):
     a = -math.log(random.random())
 
     if λfunc_integral is None:
+
         def L(t):
             y, abserr = integrate.quad(λfunc, t0, t)
             return y - a
     else:
         t0_integral = λfunc_integral(t0)
+
         def L(t):
             y = λfunc_integral(t) - t0_integral
             return y - a
@@ -219,7 +272,18 @@ def sign(x):
 
 
 class FreshPondSim:
-    def __init__(self, distance, start_time, end_time, entrances, entrance_weights, entrance_rate_func, rand_rand_velocities_and_distances_func, interpolate=False, interpolate_res=None):
+    def __init__(self,
+                 distance,
+                 start_time,
+                 end_time,
+                 entrances,
+                 entrance_weights,
+                 rand_rand_velocities_and_distances_func,
+                 entrance_rate,
+                 entrance_rate_integral=None,
+                 interpolate_rate=True,
+                 interpolate_rate_integral=True,
+                 interpolate_res=None):
         assert_positive_real(distance, 'distance')
         assert_real(start_time, 'start_time')
         assert_real(end_time, 'end_time')
@@ -231,22 +295,37 @@ class FreshPondSim:
         self.dist_around = distance
         self.entrances = entrances
         self.entrance_weights = entrance_weights
-        self.entrance_rate_func = entrance_rate_func
         self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
 
-        if interpolate:
+        if interpolate_rate or interpolate_rate_integral:
             if interpolate_res is None:
                 raise ValueError("Specify interpolate_res for interpolation")
-            def integral_func(t):
-                y, abserr = integrate.quad(entrance_rate_func, start_time, t)
-                return y
 
-            self.entrance_rate_func_integral = DynamicBoundedInterpolator(integral_func, start_time, end_time, interpolate_res)
-
-            # can also interpolate this one! it does make it somewhat fater!
-            self.entrance_rate_func = DynamicBoundedInterpolator(entrance_rate_func, start_time, end_time, interpolate_res)
+        if interpolate_rate:
+            self.entrance_rate = DynamicBoundedInterpolator(
+                entrance_rate, start_time, end_time, interpolate_res)
         else:
-            self.entrance_rate_func_integral = None
+            self.entrance_rate = entrance_rate
+
+        if interpolate_rate_integral: # Want to interplate the integral function
+            if entrance_rate_integral is None: # No integral function given
+                # Do numerical integration and interpolate to speed it up
+                def integral_func(t):
+                    y, abserr = integrate.quad(entrance_rate, start_time, t)
+                    return y
+
+                self.entrance_rate_integral = DynamicBoundedInterpolator(
+                    integral_func, start_time, end_time, interpolate_res)
+            else: # Integral function was provided
+                # Use the provided rate integral function but interpolate it
+                self.entrance_rate_integral = DynamicBoundedInterpolator(
+                    entrance_rate_integral, start_time, end_time, interpolate_res)
+        else: # Don't want to interpolate the integral function
+            # If entrance_rate_integral is not None (i.e. is provided) then
+            # that function will be used as the rate integral.
+            # If entrance_rate_integral is None, numerical integration will
+            # be used.
+            self.entrance_rate_integral = entrance_rate_integral
 
         self.pedestrians = SortedKeyList(key=lambda p: p.start_time)
         self._counts = SortedDict()
@@ -254,7 +333,8 @@ class FreshPondSim:
 
     def _distance(self, a, b):
         """signed distance of a relative to b"""
-        return circular_diff(a % self.dist_around, b % self.dist_around, self.dist_around)
+        return circular_diff(a % self.dist_around, b % self.dist_around,
+                             self.dist_around)
 
     def _distance_from(self, b):
         """returns a function that returns the signed sitance from b"""
@@ -275,21 +355,29 @@ class FreshPondSim:
     def refresh_pedestrians(self):
         """Refreshes the pedestrians in the simulation to random ones"""
         self.clear_pedestrians()
-        
-        start_times = list(random_times(self.start_time, self.end_time, self.entrance_rate_func, self.entrance_rate_func_integral))
+
+        start_times = list(
+            random_times(self.start_time, self.end_time,
+                         self.entrance_rate,
+                         self.entrance_rate_integral))
         n_pedestrians = len(start_times)
-        entrances = random.choices(population=self.entrances, weights=self.entrance_weights, k=n_pedestrians)
-        velocities, distances = self.rand_velocities_and_distances(n_pedestrians).T
-        
+        entrances = random.choices(population=self.entrances,
+                                   weights=self.entrance_weights,
+                                   k=n_pedestrians)
+        velocities, distances = self.rand_velocities_and_distances(
+            n_pedestrians).T
+
         def pedestrians_generator():
-            for start_time, entrance, velocity, dist in zip(start_times, entrances, velocities, distances):
+            for start_time, entrance, velocity, dist in zip(
+                    start_times, entrances, velocities, distances):
                 assert dist > 0
                 original_exit = entrance + dist * sign(velocity)
                 corrected_exit = self._closest_exit(original_exit)
                 corrected_dist = abs(corrected_exit - entrance)
                 if math.isclose(corrected_dist, 0, abs_tol=1e-10):
                     corrected_dist = self.dist_around
-                yield FreshPondPedestrian(self.dist_around, entrance, corrected_dist, start_time, velocity)
+                yield FreshPondPedestrian(self.dist_around, entrance,
+                                          corrected_dist, start_time, velocity)
 
         self.add_pedestrians(pedestrians_generator())
 
@@ -304,6 +392,7 @@ class FreshPondSim:
             for p in pedestrians:
                 self._assert_pedestrian_in_range(p)
                 yield p
+
         self.pedestrians.update(checked_pedestrians())
         self._recompute_counts()
 
@@ -311,7 +400,8 @@ class FreshPondSim:
         """Makes sure the pedestrian's start time is in the simulation's
         time interval"""
         if not (self.start_time <= p.start_time < self.end_time):
-            raise ValueError("Pedestrian start time is not in range [start_time, end_time)")
+            raise ValueError(
+                "Pedestrian start time is not in range [start_time, end_time)")
 
     def add_pedestrian(self, p):
         """Adds a new pedestrian to the simulation"""
@@ -329,7 +419,9 @@ class FreshPondSim:
         # If it were inclusive on the right, then the count would be one more
         # than it should be in the period after end_time and before the next
         # breakpoint after end_time
-        for t in self._counts.irange(p.start_time, p.end_time, inclusive=(True, False)):
+        for t in self._counts.irange(p.start_time,
+                                     p.end_time,
+                                     inclusive=(True, False)):
             self._counts[t] += 1
 
     def _reset_counts(self):
@@ -345,18 +437,18 @@ class FreshPondSim:
         if self.num_pedestrians() == 0:
             return
 
-        start_times = [] # pedestrians are already sorted by start time
+        start_times = []  # pedestrians are already sorted by start time
         end_times = SortedList()
         for pedestrian in self.pedestrians:
             start_times.append(pedestrian.start_time)
             end_times.add(pedestrian.end_time)
 
         n = len(start_times)
-        curr_count = 0 # current number of people
+        curr_count = 0  # current number of people
         start_times_index = 0
         end_times_index = 0
-        starts_done = False # whether all the start times have been added
-        ends_done = False # whether all the end times have been added
+        starts_done = False  # whether all the start times have been added
+        ends_done = False  # whether all the end times have been added
         while not (starts_done and ends_done):
             # determine whether a start time or an end time should be added next
             # store this in the variable take_start which is true if a start
@@ -399,6 +491,13 @@ class FreshPondSim:
                 n += 1
         return n
 
+    def n_people_saw(self, p):
+        """Returns the number of times a pedestrian sees someone"""
+        n = 0
+        for q in self.pedestrians:
+            n += p.n_intersections(q)
+        return n
+
     def intersection_directions(self, p):
         """Returns the number of people seen going in the same direction and the
         number of people seen going in the opposite direction by p as a tuple"""
@@ -409,6 +508,16 @@ class FreshPondSim:
                 n_same += 1
             elif d == -1:
                 n_diff += 1
+        return n_same, n_diff
+
+    def intersection_directions_total(self, p):
+        n_same, n_diff = 0, 0
+        for q in self.pedestrians:
+            i = p.total_intersection_direction(q)
+            if i < 0:
+                n_diff += -i
+            elif i > 0:
+                n_same += i
         return n_same, n_diff
 
     def n_people(self, t):
@@ -424,4 +533,3 @@ class FreshPondSim:
     def num_pedestrians(self):
         """Returns the total number of pedestrians in the simulation"""
         return len(self.pedestrians)
-

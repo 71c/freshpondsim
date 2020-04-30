@@ -56,7 +56,7 @@ def get_average_n_unique_saw_for_paces(sim, start_time, start_pos, distance, mil
     pedestrians = [
         FreshPondPedestrian(DISTANCE, start_pos, distance, start_time, 1/mile_time)
         for mile_time in mile_times]
-    
+
     saws_avg = np.zeros(len(pedestrians))
     for _ in range(n_reps):
         saws_avg += get_n_unique_saws(sim, pedestrians)
@@ -77,7 +77,7 @@ def plot_pace_vs_n_unique_saw(sim, start_time, start_pos, distance, mile_times, 
     plt.plot(mile_times, saws_avg)
     plt.xlabel('mile time (minutes)')
     plt.ylabel('number of unique people saw')
-    
+
     time_str = minutes_to_time_string_12hr(start_time)
     title_text = f'going {distance} mi starting at {time_str}'
     if n_reps > 1:
@@ -86,15 +86,17 @@ def plot_pace_vs_n_unique_saw(sim, start_time, start_pos, distance, mile_times, 
 
 
 def get_average_intersection_directions_for_paces(sim, start_time, start_pos, distance, mile_times, n_reps):
-    pedestrians = [
-        FreshPondPedestrian(DISTANCE, start_pos, distance, start_time, 1/mile_time)
+    # observer pedestrians going at different mile times
+    observers = [
+        FreshPondPedestrian(sim.dist_around, start_pos, distance, start_time, 1/mile_time)
         for mile_time in mile_times]
-    
-    n_same_avg = np.zeros(len(pedestrians))
-    n_diff_avg = np.zeros(len(pedestrians))
+
+    n_same_avg = np.zeros(len(observers))
+    n_diff_avg = np.zeros(len(observers))
     for _ in range(n_reps):
-        for i, p in enumerate(pedestrians):
-            n_same, n_diff = sim.intersection_directions(p)
+        for i, p in enumerate(observers):
+            # n_same, n_diff = sim.intersection_directions(p)
+            n_same, n_diff = sim.intersection_directions_total(p)
             n_same_avg[i] += n_same
             n_diff_avg[i] += n_diff
         sim.refresh_pedestrians()
@@ -104,9 +106,9 @@ def get_average_intersection_directions_for_paces(sim, start_time, start_pos, di
     return n_same_avg, n_diff_avg
 
 
-def plot_pace_vs_intersection_direction(sim, start_time, start_pos, distance, mile_times, n_reps=1):
+def plot_pace_vs_intersection_direction(sim, start_time, start_pos, observer_distance, mile_times, n_reps=1):
     n_same_avg, n_diff_avg = get_average_intersection_directions_for_paces(
-        sim, start_time, start_pos, distance, mile_times, n_reps)
+        sim, start_time, start_pos, observer_distance, mile_times, n_reps)
 
     plt.plot(mile_times, n_same_avg, '-', mile_times, n_diff_avg, '-')
     plt.legend(['num same', 'num diff'], loc='best')
@@ -114,7 +116,7 @@ def plot_pace_vs_intersection_direction(sim, start_time, start_pos, distance, mi
     plt.ylabel('number of unique people saw')
 
     time_str = minutes_to_time_string_12hr(start_time)
-    title_text = f'going {distance} mi starting at {time_str}'
+    title_text = f'going {observer_distance} mi starting at {time_str}'
     if n_reps > 1:
         title_text += f' (average of {n_reps} simulations)'
     plt.title(title_text)
