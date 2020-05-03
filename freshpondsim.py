@@ -170,10 +170,46 @@ class FreshPondPedestrian:
         """Returns the total signed intersections of self between other
         where -1 would be self and other intersecting in opposite directions and
         1 would be self and other intersecting in the same direction"""
-        n_intersections = self.n_intersections(other)
+
+        # n_intersections = self.n_intersections(other)
+        # if (self.velocity > 0) != (other.velocity > 0):
+        #     n_intersections *= -1
+        # return n_intersections
+
+
+        assert self.distance_around == other.distance_around
+        if self.end_time <= other.start_time or self.start_time >= other.end_time:
+            return False
+        if self.velocity == other.velocity:
+            return False
+        # an intersection time must be at least min_time
+        min_time = max(self.start_time, other.start_time)
+        # an intersection time must be less than max_time
+        max_time = min(self.end_time, other.end_time)
+
+        x01, t01, v1 = self.start_pos, self.start_time, self.velocity
+        x02, t02, v2 = other.start_pos, other.start_time, other.velocity
+
+        tmp = t01 * v1 - t02 * v2 + x02 - x01
+        k1 = (min_time * (v1 - v2) - tmp) / self.distance_around
+        k2 = (max_time * (v1 - v2) - tmp) / self.distance_around
+
+        # make it so that a <= b
+        if k1 <= k2:
+            a, b = k1, k2
+        else:
+            a, b = k2, k1
+
+        # number of integers in the range (a, b)
+        n_integers_between = max(0, math.ceil(b) - math.floor(a) - 1)
+
+        # number of integers in the range [k1, k2) or (k2, k1]
+        if k1 == math.floor(k1):
+            n_integers_between += 1
+
         if (self.velocity > 0) != (other.velocity > 0):
-            n_intersections *= -1
-        return n_intersections
+            n_integers_between *= -1
+        return n_integers_between
 
     def n_intersections(self, other):
         """Returns the number of intersections of self and other"""
@@ -283,7 +319,8 @@ class FreshPondSim:
                  entrance_rate_integral=None,
                  interpolate_rate=True,
                  interpolate_rate_integral=True,
-                 interpolate_res=None):
+                 interpolate_res=None,
+                 snap_exit=True):
         assert_positive_real(distance, 'distance')
         assert_real(start_time, 'start_time')
         assert_real(end_time, 'end_time')
@@ -296,6 +333,7 @@ class FreshPondSim:
         self.entrances = entrances
         self.entrance_weights = entrance_weights
         self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
+        self._snap_exit = snap_exit
 
         if interpolate_rate or interpolate_rate_integral:
             if interpolate_res is None:
@@ -371,11 +409,14 @@ class FreshPondSim:
             for start_time, entrance, velocity, dist in zip(
                     start_times, entrances, velocities, distances):
                 assert dist > 0
-                original_exit = entrance + dist * sign(velocity)
-                corrected_exit = self._closest_exit(original_exit)
-                corrected_dist = abs(corrected_exit - entrance)
-                if math.isclose(corrected_dist, 0, abs_tol=1e-10):
-                    corrected_dist = self.dist_around
+                if self._snap_exit:
+                    original_exit = entrance + dist * sign(velocity)
+                    corrected_exit = self._closest_exit(original_exit)
+                    corrected_dist = abs(corrected_exit - entrance)
+                    if math.isclose(corrected_dist, 0, abs_tol=1e-10):
+                        corrected_dist = self.dist_around
+                else:
+                    corrected_dist = dist
                 yield FreshPondPedestrian(self.dist_around, entrance,
                                           corrected_dist, start_time, velocity)
 

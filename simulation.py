@@ -7,7 +7,7 @@ from simulation_defaults import *
 
 
 def show_durations_distribution(n_samples=400000, log=False):
-    speeds, dists = rand_velocities_and_distances(n_samples).T
+    speeds, dists = default_rand_velocities_and_distances(n_samples).T
 
     # durations in hours
     durations = dists / abs(speeds) / 60
@@ -17,6 +17,17 @@ def show_durations_distribution(n_samples=400000, log=False):
     plt.hist(durations, bins='auto', density=True, log=log, histtype='step')
     plt.legend()
     plt.title('histogram of duration')
+    plt.xlabel('duration (hours)')
+    plt.ylabel('probability density')
+    plt.show()
+
+
+def show_pace_distribution(n_samples=400000, log=False):
+    speeds, dists = default_rand_velocities_and_distances(n_samples).T
+
+    plt.hist(abs(1/speeds), bins='auto', density=True, log=log, histtype='step')
+    plt.legend()
+    plt.title('histogram of speed')
     plt.xlabel('duration (hours)')
     plt.ylabel('probability density')
     plt.show()
@@ -93,21 +104,23 @@ def get_average_intersection_directions_for_paces(sim, start_time, start_pos, di
 
     n_same_avg = np.zeros(len(observers))
     n_diff_avg = np.zeros(len(observers))
-    for _ in range(n_reps):
+    people_counts = np.zeros(n_reps)
+    for k in range(n_reps):
         for i, p in enumerate(observers):
             # n_same, n_diff = sim.intersection_directions(p)
             n_same, n_diff = sim.intersection_directions_total(p)
             n_same_avg[i] += n_same
             n_diff_avg[i] += n_diff
+        people_counts[k] = sim.n_people(start_time)
         sim.refresh_pedestrians()
     n_same_avg /= n_reps
     n_diff_avg /= n_reps
 
-    return n_same_avg, n_diff_avg
+    return n_same_avg, n_diff_avg, people_counts
 
 
 def plot_pace_vs_intersection_direction(sim, start_time, start_pos, observer_distance, mile_times, n_reps=1):
-    n_same_avg, n_diff_avg = get_average_intersection_directions_for_paces(
+    n_same_avg, n_diff_avg, people_counts = get_average_intersection_directions_for_paces(
         sim, start_time, start_pos, observer_distance, mile_times, n_reps)
 
     plt.plot(mile_times, n_same_avg, '-', mile_times, n_diff_avg, '-')
@@ -121,14 +134,18 @@ def plot_pace_vs_intersection_direction(sim, start_time, start_pos, observer_dis
         title_text += f' (average of {n_reps} simulations)'
     plt.title(title_text)
 
+    return people_counts
+
 
 
 def main():
-    sim = sim_constant_rate_and_speed()
+    sim = default_sim()
 
     # plot_pace_vs_n_unique_saw(sim, 19.5*60, 0, DISTANCE, np.arange(0.01, 30, 2), 30)
 
-    plot_pace_vs_intersection_direction(sim, 15*60, 0, 0.5 * DISTANCE, np.arange(0.01, 40, 2), 50)
+    # show_pace_distribution()
+
+    # plot_pace_vs_intersection_direction(sim, 15*60, 0, DISTANCE, np.arange(0.01, 40, 2), 50)
 
     plt.show()
 

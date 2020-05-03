@@ -42,7 +42,7 @@ ENTRANCES, ENTRANCE_WEIGHTS = zip(*ENTRANCES_AND_WEIGHTS)
 WALK_SPEED_MEAN = 0.04697566213
 WALK_SPEED_STD = 0.003592860602
 
-RUN_SPEED_MU = 6.47987998337011
+RUN_SPEED_MU = 2.38553542115
 RUN_SPEED_SIGMA = 0.2730453477555863
 RUN_SPEED_SCALE = np.exp(RUN_SPEED_MU)
 
@@ -134,11 +134,11 @@ def rand_walk_velocities_and_distances(n):
 
 def rand_run_speed(n=None):
     """returns random walking velocity in miles per minute, can be negative"""
-    mile_time_secs = lognorm.rvs(RUN_SPEED_SIGMA,
+    mile_time_mins = lognorm.rvs(RUN_SPEED_SIGMA,
                                  loc=0,
                                  scale=RUN_SPEED_SCALE,
                                  size=n)
-    return np.random.choice([-1, 1], n) * 60 / mile_time_secs
+    return np.random.choice([-1, 1], n) / mile_time_mins
 
 
 def rand_run_velocities_and_distances(n):
