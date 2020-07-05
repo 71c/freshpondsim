@@ -34,3 +34,6 @@ normal
 
 i found this cool web-page
 https://stackoverflow.com/questions/7423744/how-should-i-perform-imports-in-a-python-module-without-polluting-its-namespace#7424390
+
+
+https://math.stackexchange.com/questions/642021/expected-value-as-integral-of-survival-function
