@@ -37,3 +37,39 @@ https://stackoverflow.com/questions/7423744/how-should-i-perform-imports-in-a-py
 
 
 https://math.stackexchange.com/questions/642021/expected-value-as-integral-of-survival-function
+
+
+
+
+generate X, V
+T = X / V
+
+cov(X, V) = E[X V] - E[X] E[V]
+          = E[X] E[V] - E[X] E[V]
+          = 0
+
+cov(X, T) = E[X T] - E[X] E[T]
+          = E[X X/V] - E[X] E[X/V]
+          = E[X^2] E[1/V] - E[X] E[X] E[1/V]
+          = (E[X^2] - E[X]^2) E[1/V]
+          = Var(X) E[1/V]
+
+cov(T, V) = E[T V] - E[T] E[V]
+          = E[X / V * V] - E[X / V] E[V]
+          = E[X] - E[X] E[1/V] E[V]
+          = (1 - E[1/V] E[V]) E[X]
+
+
+Let X ~ LogNormalDistribution[µx, σx]
+Let V ~ LogNormalDistribution[µv, σv]
+
+E[X] = exp(µx + σx^2 / 2)
+E[V] = exp(µv + σv^2 / 2)
+E[1/V] = exp(-µv + σv^2 / 2)
+Var(X) = exp(2 µx + σx^2) (exp(σx^2) - 1)
+
+cov(X, T) = Var(X) E[1/V]
+          = exp(2 µx + σx^2) (exp(σx^2) - 1) exp(-µv + σv^2 / 2)
+
+cov(T, V) = (1 - E[1/V] E[V]) E[X]
+          = (1 - exp(σv^2)) exp(µx + σx^2 / 2)

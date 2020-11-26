@@ -536,7 +536,8 @@ class FreshPondSim:
         """Returns the number of times a pedestrian sees someone"""
         n = 0
         for q in self.pedestrians:
-            n += p.n_intersections(q)
+            if p.end_time > q.start_time and p.start_time < q.end_time:
+                n += p.n_intersections(q)
         return n
 
     def intersection_directions(self, p):
@@ -544,21 +545,23 @@ class FreshPondSim:
         number of people seen going in the opposite direction by p as a tuple"""
         n_same, n_diff = 0, 0
         for q in self.pedestrians:
-            d = q.intersection_direction(p)
-            if d == 1:
-                n_same += 1
-            elif d == -1:
-                n_diff += 1
+            if p.end_time > q.start_time and p.start_time < q.end_time:
+                d = q.intersection_direction(p)
+                if d == 1:
+                    n_same += 1
+                elif d == -1:
+                    n_diff += 1
         return n_same, n_diff
 
     def intersection_directions_total(self, p):
         n_same, n_diff = 0, 0
         for q in self.pedestrians:
-            i = p.total_intersection_direction(q)
-            if i < 0:
-                n_diff += -i
-            elif i > 0:
-                n_same += i
+            if p.end_time > q.start_time and p.start_time < q.end_time:
+                i = p.total_intersection_direction(q)
+                if i < 0:
+                    n_diff += -i
+                elif i > 0:
+                    n_same += i
         return n_same, n_diff
 
     def n_people(self, t):

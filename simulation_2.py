@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from simulation import plot_pace_vs_intersection_direction
 import cProfile
 from scipy.stats import ttest_rel
+from tqdm import tqdm
 
 
 def get_indepenent_velocities_and_distances_func(vfunc, dfunc):
@@ -57,8 +58,16 @@ def get_simple_sim_multiple_mile_time(distance, dt, entrance_rate, mile_times,
         get_choice_speed_func(mile_times, mile_times_probs),
         1 - same_direction_prop)
 
-    get_vdist = get_indepenent_velocities_and_distances_func(
-        velocity_func, lambda n: np.ones(n) * n_times_around * distance)
+    # get_vdist = get_indepenent_velocities_and_distances_func(
+    #     velocity_func, lambda n: np.ones(n) * n_times_around * distance)
+
+    # TEMPORARY
+    expected_inverse_velocity = np.dot(mile_times, mile_times_probs)
+    def get_vdist(n):
+        velocities = velocity_func(n)
+        duration = n_times_around * distance * expected_inverse_velocity
+        distances = velocities * duration
+        return np.stack((velocities, distances)).T
 
     # return FreshPondSim(distance,
     #                     0,
@@ -226,9 +235,11 @@ def test_theory():
 
 
 def test_prediction_stationary():
+    mile_times = np.array([5, 10, 11, 9, 20, 23, 15, 18, 19, 21])
+    mile_times_probs = np.array([0.05, 0.05, 0.025, 0.025, 0.25, 0.2, 0.1, 0.1, 0.1, 0.1])
     sim = get_simple_sim_multiple_mile_time(
-        2.46, 60 * 60 * 5, 2.2, [5, 10, 11, 9, 20, 23, 15, 18, 19, 21],
-        [0.05, 0.05, 0.025, 0.025, 0.25, 0.2, 0.1, 0.1, 0.1, 0.1], 2.0, 1.0)
+        2.46, 60 * 60 * 5, 2.2, mile_times,
+        mile_times_probs, 2.0, 1.0)
 
     p = FreshPondPedestrian(sim.dist_around,
                             1.0,
@@ -236,12 +247,12 @@ def test_prediction_stationary():
                             60 * 60 * 4,
                             time_delta=36)
 
-    predicted_mean_w = 18.15
-    # predicted_mean_w = 20
+    # predicted_mean_w = np.dot(mile_times, mile_times_probs)
+    predicted_mean_w = 1 / np.dot(1 / mile_times, mile_times_probs)
 
     preds = []
     trues = []
-    for _ in range(40):
+    for _ in tqdm(range(40)):
         predicted_n_people = sim.n_people_saw(p) * predicted_mean_w * sim.dist_around / (p.end_time - p.start_time)
 
         # true_n_people = sim.n_people(p.start_time)

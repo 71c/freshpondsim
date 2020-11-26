@@ -10,6 +10,7 @@ matplotlib = "*"
 scipy = "*"
 pynverse = "*"
 sortedcontainers = "*"
+tqdm = "*"
 
 [requires]
 python_version = "3.7"
