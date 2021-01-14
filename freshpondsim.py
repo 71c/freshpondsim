@@ -314,7 +314,7 @@ class FreshPondSim:
                  end_time,
                  entrances,
                  entrance_weights,
-                 rand_rand_velocities_and_distances_func,
+                 rand_velocities_and_distances_func,
                  entrance_rate,
                  entrance_rate_integral=None,
                  interpolate_rate=True,
@@ -332,7 +332,7 @@ class FreshPondSim:
         self.dist_around = distance
         self.entrances = entrances
         self.entrance_weights = entrance_weights
-        self.rand_velocities_and_distances = rand_rand_velocities_and_distances_func
+        self.rand_velocities_and_distances = rand_velocities_and_distances_func
         self._snap_exit = snap_exit
 
         if interpolate_rate or interpolate_rate_integral:
@@ -577,3 +577,11 @@ class FreshPondSim:
     def num_pedestrians(self):
         """Returns the total number of pedestrians in the simulation"""
         return len(self.pedestrians)
+
+    def get_pedestrians_in_interval(self, start, stop):
+        return list(self.pedestrians.irange_key(start, stop))
+
+    def num_entrances_in_interval(self, start, stop):
+        """Returns the number of pedestrians who entered in the given interval
+        of time [start, stop]"""
+        return len(self.get_pedestrians_in_interval(start, stop))
