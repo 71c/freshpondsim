@@ -4,14 +4,8 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.stats import ttest_rel, ttest_ind, ttest_1samp
 from tqdm import tqdm
+from utils import get_random_velocities_and_distances_func
 
-def get_random_velocities_and_distances_func(random_duration_func, distance_traveled):
-    def ret(n):
-        durations = random_duration_func(n)
-        distances = np.ones(n) * distance_traveled
-        velocities = distances / durations
-        return np.array([velocities, distances]).T
-    return ret
 
 
 def random_exponential_func(scale):

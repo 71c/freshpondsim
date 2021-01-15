@@ -280,12 +280,16 @@ def rand_next_time(t0, λfunc, λfunc_integral=None):
             return y - a
 
     tol = 1e-4
-
-    x = newtons_method(t0, L, λfunc, tol, 20)
-
-    if abs(L(x)) > tol:
+    try:
+        x = newtons_method(t0, L, λfunc, tol, 20)
+    except OverflowError as e: # can happen when we use the interpolation thing
+        print('OverflowError:', e)
         inv_L = inversefunc(L, y_values=[0], accuracy=5)
         x = inv_L[0]
+    else:
+        if abs(L(x)) > tol:
+            inv_L = inversefunc(L, y_values=[0], accuracy=5)
+            x = inv_L[0]
 
     return x
 
