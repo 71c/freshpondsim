@@ -8,6 +8,7 @@ from tictoc import tic, toc
 from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolator
 from scipy.interpolate import interp1d
 import numpy as np
+from scipy.optimize import root_scalar
 
 
 def is_real(x):
@@ -258,7 +259,10 @@ def newtons_method(x0, func, d_func, tol, max_iter):
     x = x0
     for _ in range(max_iter):
         y = func(x)
-        x -= y / d_func(x)
+        d = d_func(x)
+        if d == 0:
+            raise OverflowError
+        x -= y / d
         if abs(y) < tol:
             break
     return x
@@ -268,7 +272,6 @@ def rand_next_time(t0, λfunc, λfunc_integral=None):
     a = -math.log(random.random())
 
     if λfunc_integral is None:
-
         def L(t):
             y, abserr = integrate.quad(λfunc, t0, t)
             return y - a
@@ -282,15 +285,14 @@ def rand_next_time(t0, λfunc, λfunc_integral=None):
     tol = 1e-4
     try:
         x = newtons_method(t0, L, λfunc, tol, 20)
+
     except OverflowError as e: # can happen when we use the interpolation thing
-        print('OverflowError:', e)
         inv_L = inversefunc(L, y_values=[0], accuracy=5)
         x = inv_L[0]
     else:
         if abs(L(x)) > tol:
             inv_L = inversefunc(L, y_values=[0], accuracy=5)
             x = inv_L[0]
-
     return x
 
 
@@ -589,3 +591,15 @@ class FreshPondSim:
         """Returns the number of pedestrians who entered in the given interval
         of time [start, stop]"""
         return len(self.get_pedestrians_in_interval(start, stop))
+    
+    def get_enter_and_exit_times_in_interval(self, start, stop):
+        """Returns the entrance and exit times in a given time interval
+        as a tuple of lists (entrance_times, exit_times)."""
+        start_times = []
+        end_times = []
+        for p in self.pedestrians:
+            if start <= p.start_time <= stop:
+                start_times.append(p.start_time)
+            if start <= p.end_time <= stop:
+                end_times.append(p.end_time)
+        return start_times, end_times

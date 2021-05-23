@@ -49,6 +49,9 @@ paces_dict = {
     for k, v in group_by(paces, lambda x: x[1]).items()
 }
 
+# plt.hist([x[0] for x in paces], bins='auto')
+# plt.show()
+
 # minutes per mile == 26.8224 / (meters per second)
 
 for name, values in paces_dict.items():

@@ -46,7 +46,7 @@ rand_veloc_dist_func = get_random_velocities_and_distances_func(
 def get_expected_n_people(t):
     return integrate(
         lambda tau: duration_dist.sf(tau) * entrance_rate(t - tau),
-        0, t
+        0, t - t0
     )
 
 
@@ -63,11 +63,11 @@ sim = FreshPondSim(distance=2.5,
                    interpolate_res=0.001,
                    snap_exit=False)
 
-t1 = 0.4 # first time point to sample
-t2 = 7.4 # second time point to sample
+t1 = 8.0 # first time point to sample
+t2 = 9.0 # second time point to sample
 
 # gather samples
-n_samples = 200000
+n_samples = 10000
 samples = []
 for sample_num in tqdm(range(n_samples)):
     n1 = sim.n_people(t1)
@@ -106,6 +106,3 @@ observed_variance = np.var(samples, ddof=1)
 expected_variance = skellam_dist.var()
 print(f"observed variance: {observed_variance:.2f}, expected variance: {expected_variance:.2f}")
 print(f"observed mean: {np.mean(samples):.2f}, expected mean: {skellam_dist.mean():.2f}")
-
-print()
-print()
