@@ -585,6 +585,8 @@ class FreshPondSim:
         return len(self.pedestrians)
 
     def get_pedestrians_in_interval(self, start, stop):
+        """Returns a list of all the pedestrians who entered in the interval
+        [start, stop]"""
         return list(self.pedestrians.irange_key(start, stop))
 
     def num_entrances_in_interval(self, start, stop):
@@ -603,3 +605,11 @@ class FreshPondSim:
             if start <= p.end_time <= stop:
                 end_times.append(p.end_time)
         return start_times, end_times
+    
+    def get_pedestrians_at_time(self, t):
+        """Returns a list of all the pedestrians who were there at time t"""
+        # get all pedestrians who entered at or before time t
+        entered_before_t = self.pedestrians.irange_key(
+            min_key=None, max_key=t, inclusive=(True, True))
+        # Of those, return return the ones who exited after time t
+        return [p for p in entered_before_t if p.end_time > t]
