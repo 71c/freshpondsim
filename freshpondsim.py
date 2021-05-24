@@ -3,7 +3,9 @@ import math
 from numbers import Real
 from pynverse import inversefunc
 import scipy.integrate as integrate
-from sortedcontainers import SortedList, SortedKeyList, SortedDict
+from sortedcontainers import SortedKeyList, SortedDict
+from operator import attrgetter
+
 from tictoc import tic, toc
 from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolator
 from scipy.interpolate import interp1d
@@ -17,7 +19,7 @@ def is_real(x):
 
 def assert_real(val, name):
     if not is_real(val):
-        print(f"{name} should be a real number but is {val}")
+        raise ValueError(f"{name} should be a real number but is {val}")
 
 
 def assert_nonnegative_real(val, name):
@@ -52,12 +54,11 @@ class FreshPondPedestrian:
         velocity: velocity in miles per minute
         time_delta: time taken in minutes
         """
-        assert_positive_real(distance_around, 'distance_around')
-        if not (is_real(start_pos) and 0 <= start_pos <= distance_around):
+        assert distance_around > 0
+        if not (0 <= start_pos <= distance_around):
             raise ValueError(
                 f"start_pos {start_pos} is not a number in range [0, distance_around]"
             )
-        assert_real(start_time, 'start_time')
 
         self.distance_around = distance_around
         self.start_pos = start_pos
@@ -67,20 +68,17 @@ class FreshPondPedestrian:
         if velocity is not None and time_delta is not None:
             raise ValueError("Don't specify both velocity and time_delta")
         if velocity is not None:
-            assert_nonnegative_real(travel_distance, 'travel_distance')
-            assert_real(velocity, 'velocity')
+            assert travel_distance >= 0
             if travel_distance == 0:
                 raise ValueError(
                     "Travel distance cannot be zero if specifying velocity. Specify time_delta instead."
                 )
-            # travel_distance != 0
             if velocity == 0:
                 raise ValueError("Velocity cannot be zero")
             self.end_time = start_time + travel_distance / abs(velocity)
             self.velocity = velocity
         elif time_delta is not None:
-            assert_real(travel_distance, 'travel_distance')
-            assert_positive_real(time_delta, 'time_delta')
+            assert time_delta > 0
             self.end_time = start_time + time_delta
             self.velocity = travel_distance / time_delta
         else:
@@ -371,7 +369,7 @@ class FreshPondSim:
             # be used.
             self.entrance_rate_integral = entrance_rate_integral
 
-        self.pedestrians = SortedKeyList(key=lambda p: p.start_time)
+        self.pedestrians = SortedKeyList(key=attrgetter('start_time'))
         
         self._counts = SortedDict()
         self._counts[self.start_time] = 0

@@ -78,6 +78,8 @@ sim = FreshPondSim(distance=2.5,
 pr.disable()
 pr.print_stats(sort='cumulative')
 
+print(sim.num_pedestrians())
+
 # TODO: implement code to make SortedKeyList faster, specifically initializing
 # it with an already-sorted list
 

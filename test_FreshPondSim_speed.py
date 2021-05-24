@@ -12,7 +12,7 @@ import scipy.integrate
 t0 = 0
 t_end = 90
 
-entrance_rate_constant = 1400
+entrance_rate_constant = 5000
 
 ###### Constant Entry Rate
 def entrance_rate(t):
@@ -55,8 +55,8 @@ rand_veloc_dist_func = get_random_velocities_and_distances_func(
                                     duration_dist.rvs, 1)
 
 
-# pr = cProfile.Profile()
-# pr.enable()
+pr = cProfile.Profile()
+pr.enable()
 
 sim = FreshPondSim(distance=2.5,
                    start_time=t0,
@@ -70,14 +70,14 @@ sim = FreshPondSim(distance=2.5,
                    interpolate_rate_integral=False,
                    snap_exit=False)
 
+pr.disable()
+pr.print_stats(sort='tottime')
+
+
+# pr = cProfile.Profile()
+# pr.enable()
+
+# print(sim.n_people(10))
+
 # pr.disable()
 # pr.print_stats(sort='cumulative')
-
-
-pr = cProfile.Profile()
-pr.enable()
-
-print(sim.n_people(10))
-
-pr.disable()
-pr.print_stats(sort='cumulative')
