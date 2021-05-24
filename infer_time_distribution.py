@@ -13,7 +13,7 @@ import scipy.integrate
 t0 = 0
 t_end = 90
 
-entrance_rate_constant = 2000
+entrance_rate_constant = 1400
 
 ###### Constant Entry Rate
 def entrance_rate(t):
@@ -50,8 +50,8 @@ def integrate(func, a, b):
 
 # Using Weibull distribution. I would like a generalization of the exponential
 # distribution. Weibull and Gamma are both suitable for this.
-mean_time = 4.5 # expected value of time spent
-k = 1 # shape parameter of weibull distribution
+mean_time = 2.0 # expected value of time spent
+k = 4 # shape parameter of weibull distribution
 scale = mean_time / gamma(1 + 1/k) # scale parameter of Weibull distribution
 duration_dist = scipy.stats.weibull_min(k, scale=scale)
 
@@ -78,6 +78,8 @@ sim = FreshPondSim(distance=2.5,
 pr.disable()
 pr.print_stats(sort='cumulative')
 
+# TODO: implement code to make SortedKeyList faster, specifically initializing
+# it with an already-sorted list
 
 def plot_empirical_cdf(a, **kwargs):
     # https://stackoverflow.com/a/11692365/9911203
@@ -153,7 +155,11 @@ def theoretical_time_cdf_function_limit(S):
 
 t = 60
 
-times = np.array([p.end_time - p.start_time for p in sim.get_pedestrians_at_time(t)])
+pedestrians = sim.get_pedestrians_at_time(t)
+times = np.array([p.end_time - p.start_time for p in pedestrians])
+
+# plt.hist([p.start_time for p in pedestrians], bins='auto', density=True)
+# plt.figure()
 
 # times_est = 2 * np.array([t - p.start_time for p in sim.get_pedestrians_at_time(t)])
 # plt.hist(times_est, bins='auto', label='est times hist')

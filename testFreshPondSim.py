@@ -1,7 +1,7 @@
 from freshpondsim import FreshPondSim, FreshPondPedestrian
 from simulation_defaults import *
 import math
-from tictoc import tic, toc
+from tictoc import *
 import cProfile
 
 
@@ -19,6 +19,9 @@ def slow_n_people(sim, t):
 
 
 def test_n_people():
+    # pr = cProfile.Profile()
+    # pr.enable()
+
     sim = default_sim()
 
     spacing = 0.5
@@ -44,6 +47,9 @@ def test_n_people():
     assert_equals(sim.n_people(60), 0)
     assert_equals(sim.n_people(70), 0)
 
+    # pr.disable()
+    # pr.print_stats(sort='cumulative')
+
 
 def test_add_pedestrians():
     sim = default_sim()
@@ -63,11 +69,11 @@ def test_add_pedestrians():
 
 def test_interpolation():
     tic('FreshPondSim without interpolation init')
-    sim1 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, rand_velocities_and_distances, default_day_rate_func, interpolate_rate=False, interpolate_rate_integral=False)
+    sim1 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_rand_velocities_and_distances, default_day_rate_func, interpolate_rate=False, interpolate_rate_integral=False)
     toc('FreshPondSim without interpolation init')
 
     tic('FreshPondSim with interpolation init')
-    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, rand_velocities_and_distances, default_day_rate_func, interpolate_rate=True, interpolate_rate_integral=True, interpolate_res=2.483)
+    sim2 = FreshPondSim(DISTANCE, 0, DAY_LENGTH, ENTRANCES, ENTRANCE_WEIGHTS, default_rand_velocities_and_distances, default_day_rate_func, interpolate_rate=True, interpolate_rate_integral=True, interpolate_res=2.483)
     toc('FreshPondSim with interpolation init')
 
     print()
@@ -94,9 +100,94 @@ def test_interpolation():
     test_interpolation(100)
 
 
+def test_lazy_pedestrian_count():
+
+    # pr = cProfile.Profile()
+    # pr.enable()
+
+    print("Initializing simulation")
+    sim = default_sim()
+
+    assert sim._counts_are_correct == False
+
+    print("Getting number of people at time 1000")
+    print("Number of people at time 1000:", sim.n_people(1000))
+
+    assert sim._counts_are_correct == True
+
+    spacing = 0.5
+    for t in np.arange(sim.start_time - 5 * spacing, sim.end_time + 5 * spacing, spacing):
+        assert_equals(sim.n_people(t), slow_n_people(sim, t))
+        assert sim._counts_are_correct == True
+    
+    print("Refreshing pedestrians")
+    sim.refresh_pedestrians()
+
+    assert sim._counts_are_correct == False
+
+    print("Clearing pedestrians")
+    sim.clear_pedestrians()
+
+    assert sim._counts_are_correct == True
+
+    assert sim.n_people(1000) == 0
+
+    print("Refreshing pedestrians")
+    sim.refresh_pedestrians()
+
+    assert sim._counts_are_correct == False
+
+    print("Adding a pedestrian")
+    sim.add_pedestrian(FreshPondPedestrian(DISTANCE, start_pos=0, travel_distance=DISTANCE, start_time=0, time_delta=60))
+
+    assert sim._counts_are_correct == False
+
+    for t in np.arange(sim.start_time - 5 * spacing, sim.end_time + 5 * spacing, spacing):
+        assert_equals(sim.n_people(t), slow_n_people(sim, t))
+        assert sim._counts_are_correct == True
+    
+    print("Adding a pedestrian")
+    sim.add_pedestrian(FreshPondPedestrian(DISTANCE, start_pos=0, travel_distance=DISTANCE, start_time=0, time_delta=60))
+
+    assert sim._counts_are_correct == True
+
+    for t in np.arange(sim.start_time - 5 * spacing, sim.end_time + 5 * spacing, spacing):
+        assert_equals(sim.n_people(t), slow_n_people(sim, t))
+        assert sim._counts_are_correct == True
+    
+    print("Adding 0 pedestrians")
+    sim.add_pedestrians([])
+
+    assert sim._counts_are_correct == True
+
+    print("Getting number of people at time 1000")
+    print("Number of people at time 1000:", sim.n_people(1000))
+
+    print("Adding 1 pedestrians")
+    sim.add_pedestrians([FreshPondPedestrian(DISTANCE, start_pos=0, travel_distance=DISTANCE, start_time=10, time_delta=60)])
+
+    assert sim._counts_are_correct == False
+
+    print("Getting number of people at time 1000")
+    print("Number of people at time 1000:", sim.n_people(1000))
+
+    # pr.disable()
+    # pr.print_stats(sort='cumulative')
+
 
 if __name__ == '__main__':
-    # test_n_people()
-    # test_add_pedestrians()
+    
 
-    test_interpolation()
+    # test_interpolation()
+
+    print("Running test_n_people")
+    test_n_people()
+    print("Test passed\n")
+
+    print("Running test_add_pedestrians")
+    test_add_pedestrians()
+    print("Test passed\n")
+
+    print("Running test_lazy_pedestrian_count")
+    test_lazy_pedestrian_count()
+    print("Test passed")

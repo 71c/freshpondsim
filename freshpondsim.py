@@ -372,7 +372,12 @@ class FreshPondSim:
             self.entrance_rate_integral = entrance_rate_integral
 
         self.pedestrians = SortedKeyList(key=lambda p: p.start_time)
+        
         self._counts = SortedDict()
+        self._counts[self.start_time] = 0
+
+        self._counts_are_correct = True
+
         self.refresh_pedestrians()
 
     def _distance(self, a, b):
@@ -432,6 +437,7 @@ class FreshPondSim:
         """Removes all pedestrains in the simulation"""
         self.pedestrians.clear()
         self._reset_counts()
+        self._counts_are_correct = True
 
     def add_pedestrians(self, pedestrians):
         """Adds all the given pedestrians to the simulation"""
@@ -440,8 +446,14 @@ class FreshPondSim:
                 self._assert_pedestrian_in_range(p)
                 yield p
 
+        initial_num_pedestrians = self.num_pedestrians()
         self.pedestrians.update(checked_pedestrians())
-        self._recompute_counts()
+        final_num_pedestrians = self.num_pedestrians()
+
+        if final_num_pedestrians > initial_num_pedestrians:
+            self._counts_are_correct = False
+        else:
+            assert final_num_pedestrians == initial_num_pedestrians
 
     def _assert_pedestrian_in_range(self, p):
         """Makes sure the pedestrian's start time is in the simulation's
@@ -455,21 +467,23 @@ class FreshPondSim:
         self._assert_pedestrian_in_range(p)
         self.pedestrians.add(p)
 
-        # add a new breakpoint at the pedestrian's start time if it not there
-        self._counts[p.start_time] = self.n_people(p.start_time)
+        # Update counts only when counts are correct
+        if self._counts_are_correct:
+            # add a new breakpoint at the pedestrian's start time if it not there
+            self._counts[p.start_time] = self.n_people(p.start_time)
 
-        # add a new breakpoint at the pedestrian's end time if it not there
-        self._counts[p.end_time] = self.n_people(p.end_time)
+            # add a new breakpoint at the pedestrian's end time if it not there
+            self._counts[p.end_time] = self.n_people(p.end_time)
 
-        # increment all the counts in the pedestrian's interval of time
-        # inclusive on the left, exclusive on the right
-        # If it were inclusive on the right, then the count would be one more
-        # than it should be in the period after end_time and before the next
-        # breakpoint after end_time
-        for t in self._counts.irange(p.start_time,
-                                     p.end_time,
-                                     inclusive=(True, False)):
-            self._counts[t] += 1
+            # increment all the counts in the pedestrian's interval of time
+            # inclusive on the left, exclusive on the right
+            # If it were inclusive on the right, then the count would be one more
+            # than it should be in the period after end_time and before the next
+            # breakpoint after end_time
+            for t in self._counts.irange(p.start_time,
+                                        p.end_time,
+                                        inclusive=(True, False)):
+                self._counts[t] += 1
 
     def _reset_counts(self):
         """Clears _counts and sets count at start_time to 0"""
@@ -479,16 +493,15 @@ class FreshPondSim:
     def _recompute_counts(self):
         """Store how many people there are whenever someone enters or exits so
         the number of people at a given time can be found quickly later"""
+        # print("Recomputing counts")
         self._reset_counts()
 
         if self.num_pedestrians() == 0:
             return
 
-        start_times = []  # pedestrians are already sorted by start time
-        end_times = SortedList()
-        for pedestrian in self.pedestrians:
-            start_times.append(pedestrian.start_time)
-            end_times.add(pedestrian.end_time)
+        # pedestrians are already sorted by start time
+        start_times = [p.start_time for p in self.pedestrians]
+        end_times = sorted([p.end_time for p in self.pedestrians])
 
         n = len(start_times)
         curr_count = 0  # current number of people
@@ -572,6 +585,11 @@ class FreshPondSim:
 
     def n_people(self, t):
         """Returns the number of people at a given time"""
+
+        if not self._counts_are_correct:
+            self._recompute_counts()
+            self._counts_are_correct = True
+
         if t in self._counts:
             return self._counts[t]
         elif t < self.start_time:
