@@ -8,12 +8,14 @@ from utils import get_random_velocities_and_distances_func
 import scipy.stats
 from scipy.special import gamma
 import scipy.integrate
+# import tracemalloc
+from tqdm import tqdm
 
 
 t0 = 0
 t_end = 90
 
-entrance_rate_constant = 1400
+entrance_rate_constant = 5000
 
 ###### Constant Entry Rate
 def entrance_rate(t):
@@ -23,7 +25,10 @@ def entrance_rate(t):
 def entrance_rate_integral(t):
     if t < t0:
         return 0
-    return entrance_rate_constant * t
+    return entrance_rate_constant * (t - t0)
+def entrance_rate_integral_inverse(y):
+    assert y >= 0
+    return y / entrance_rate_constant + t0
 
 
 ###### Sinusoidal Varying Entry Rate
@@ -39,6 +44,7 @@ def entrance_rate_integral(t):
 #     if t < t0:
 #         return 0
 #     return entrance_rate_constant * t + a / omega * np.sin(omega * t)
+# entrance_rate_integral_inverse = None
 
 
 def integrate(func, a, b):
@@ -50,8 +56,8 @@ def integrate(func, a, b):
 
 # Using Weibull distribution. I would like a generalization of the exponential
 # distribution. Weibull and Gamma are both suitable for this.
-mean_time = 2.0 # expected value of time spent
-k = 4 # shape parameter of weibull distribution
+mean_time = 10.0 # expected value of time spent
+k = 1.4 # shape parameter of weibull distribution
 scale = mean_time / gamma(1 + 1/k) # scale parameter of Weibull distribution
 duration_dist = scipy.stats.weibull_min(k, scale=scale)
 
@@ -60,8 +66,10 @@ rand_veloc_dist_func = get_random_velocities_and_distances_func(
                                     duration_dist.rvs, 1)
 
 
-pr = cProfile.Profile()
-pr.enable()
+# pr = cProfile.Profile()
+# pr.enable()
+
+tic()
 
 sim = FreshPondSim(distance=2.5,
                    start_time=t0,
@@ -71,17 +79,35 @@ sim = FreshPondSim(distance=2.5,
                    rand_velocities_and_distances_func=rand_veloc_dist_func,
                    entrance_rate=entrance_rate,
                    entrance_rate_integral=entrance_rate_integral,
+                   entrance_rate_integral_inverse=entrance_rate_integral_inverse,
                    interpolate_rate=False,
                    interpolate_rate_integral=False,
                    snap_exit=False)
 
-pr.disable()
-pr.print_stats(sort='cumulative')
 
-print(sim.num_pedestrians())
 
-# TODO: implement code to make SortedKeyList faster, specifically initializing
-# it with an already-sorted list
+# pr.disable()
+# pr.print_stats(sort='cumulative')
+
+t = 86
+n_reps = 1
+# If I want to do a HUGE simulation, like entrance_rate_constant=1e6,
+# then doing just one simulation takes up like 30GB of memory so in these cases
+# it is better to run multiple simulations and combine the results which gives
+# the same results. For example instead of setting entrance_rate_constant=1e6,
+# set entrance_rate_constant=50k and n_reps=20.
+
+times = []
+
+times.extend(p.end_time - p.start_time for p in sim.get_pedestrians_at_time(t))
+
+for _ in tqdm(range(n_reps - 1)):
+    sim.refresh_pedestrians()
+    times.extend(p.end_time - p.start_time for p in sim.get_pedestrians_at_time(t))
+
+times = np.array(times)
+
+toc()
 
 def plot_empirical_cdf(a, **kwargs):
     # https://stackoverflow.com/a/11692365/9911203
@@ -154,12 +180,6 @@ def theoretical_time_cdf_function_limit(S):
     return np.vectorize(F)
 
 
-
-t = 60
-
-pedestrians = sim.get_pedestrians_at_time(t)
-times = np.array([p.end_time - p.start_time for p in pedestrians])
-
 # plt.hist([p.start_time for p in pedestrians], bins='auto', density=True)
 # plt.figure()
 
@@ -176,6 +196,9 @@ limiting_theoretical_cdf = theoretical_time_cdf_function_limit(duration_dist.sf)
 x = np.linspace(duration_dist.ppf(0.001), duration_dist.ppf(0.999), 100)
 plt.plot(x, duration_dist.cdf(x), label='true CDF')
 plt.plot(x, theoretical_cdf(x), label='sample CDF')
+
+print(theoretical_cdf(2.0))
+print(limiting_theoretical_cdf(2.0))
 
 
 plot_empirical_cdf(times, label='empirical sample CDF')

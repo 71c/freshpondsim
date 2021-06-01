@@ -5,12 +5,7 @@ from pynverse import inversefunc
 import scipy.integrate as integrate
 from sortedcontainers import SortedKeyList, SortedDict
 from operator import attrgetter
-
-from tictoc import tic, toc
-from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolator
-from scipy.interpolate import interp1d
-import numpy as np
-from scipy.optimize import root_scalar
+from function_interpolator import DynamicBoundedInterpolator
 
 
 def is_real(x):
@@ -266,39 +261,43 @@ def newtons_method(x0, func, d_func, tol, max_iter):
     return x
 
 
-def rand_next_time(t0, λfunc, λfunc_integral=None):
+def rand_next_time(t0, λfunc, λfunc_integral=None, λfunc_integral_inverse=None):
     a = -math.log(random.random())
 
-    if λfunc_integral is None:
-        def L(t):
-            y, abserr = integrate.quad(λfunc, t0, t)
-            return y - a
-    else:
-        t0_integral = λfunc_integral(t0)
+    if λfunc_integral_inverse is None:
+        if λfunc_integral is None:
+            def L(t):
+                y, abserr = integrate.quad(λfunc, t0, t)
+                return y - a
+        else:
+            t0_integral = λfunc_integral(t0)
 
-        def L(t):
-            y = λfunc_integral(t) - t0_integral
-            return y - a
+            def L(t):
+                y = λfunc_integral(t) - t0_integral
+                return y - a
 
-    tol = 1e-4
-    try:
-        x = newtons_method(t0, L, λfunc, tol, 20)
+        tol = 1e-4
+        try:
+            x = newtons_method(t0, L, λfunc, tol, 20)
 
-    except OverflowError as e: # can happen when we use the interpolation thing
-        inv_L = inversefunc(L, y_values=[0], accuracy=5)
-        x = inv_L[0]
-    else:
-        if abs(L(x)) > tol:
+        except OverflowError: # can happen when we use the interpolation thing
             inv_L = inversefunc(L, y_values=[0], accuracy=5)
             x = inv_L[0]
-    return x
+        else:
+            if abs(L(x)) > tol:
+                inv_L = inversefunc(L, y_values=[0], accuracy=5)
+                x = inv_L[0]
+        return x
+    else:
+        assert λfunc_integral is not None
+        return λfunc_integral_inverse(λfunc_integral(t0) + a)
 
 
-def random_times(t0, t_max, λfunc, λfunc_integral=None):
-    t = rand_next_time(t0, λfunc, λfunc_integral)
+def random_times(t0, t_max, λfunc, λfunc_integral=None, λfunc_integral_inverse=None):
+    t = rand_next_time(t0, λfunc, λfunc_integral, λfunc_integral_inverse)
     while t < t_max:
         yield t
-        t = rand_next_time(t, λfunc, λfunc_integral)
+        t = rand_next_time(t, λfunc, λfunc_integral, λfunc_integral_inverse)
 
 
 def circular_diff(a, b, max_val):
@@ -321,6 +320,7 @@ class FreshPondSim:
                  rand_velocities_and_distances_func,
                  entrance_rate,
                  entrance_rate_integral=None,
+                 entrance_rate_integral_inverse=None,
                  interpolate_rate=True,
                  interpolate_rate_integral=True,
                  interpolate_res=None,
@@ -369,6 +369,8 @@ class FreshPondSim:
             # be used.
             self.entrance_rate_integral = entrance_rate_integral
 
+        self.entrance_rate_integral_inverse = entrance_rate_integral_inverse
+
         self.pedestrians = SortedKeyList(key=attrgetter('start_time'))
         
         self._counts = SortedDict()
@@ -406,8 +408,10 @@ class FreshPondSim:
         start_times = list(
             random_times(self.start_time, self.end_time,
                          self.entrance_rate,
-                         self.entrance_rate_integral))
+                         self.entrance_rate_integral,
+                         self.entrance_rate_integral_inverse))
         n_pedestrians = len(start_times)
+        # print(n_pedestrians)
         entrances = random.choices(population=self.entrances,
                                    weights=self.entrance_weights,
                                    k=n_pedestrians)
