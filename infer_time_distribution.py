@@ -15,7 +15,7 @@ from tqdm import tqdm
 t0 = 0
 t_end = 90
 
-entrance_rate_constant = 5000
+entrance_rate_constant = 1000
 
 ###### Constant Entry Rate
 def entrance_rate(t):
@@ -89,7 +89,7 @@ sim = FreshPondSim(distance=2.5,
 # pr.disable()
 # pr.print_stats(sort='cumulative')
 
-t = 86
+t = 20
 n_reps = 1
 # If I want to do a HUGE simulation, like entrance_rate_constant=1e6,
 # then doing just one simulation takes up like 30GB of memory so in these cases
