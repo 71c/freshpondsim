@@ -66,3 +66,33 @@ for name, values in paces_dict.items():
 plt.legend()
 
 plt.show()
+
+
+
+
+
+#### Very very rough fitting Weibull distribution to real data to estimate
+#### duration distribution parametrically
+
+durations = [] # in minutes
+distance_around = 2.46 # miles
+for mins_per_mile, method in paces:
+    for _ in range(100):
+        n_times_around = np.random.uniform(0.2, 1.8)
+        duration = n_times_around * distance_around * mins_per_mile
+        durations.append(duration)
+
+# print('[' + ','.join(f'{x:.3f}' for x in durations) + ']')
+
+from scipy.stats import weibull_min
+params = weibull_min.fit(durations, floc=0)
+print(params)
+
+w = weibull_min(*params)
+print(np.mean(durations))
+print(w.mean())
+
+plt.hist(durations, bins='auto', density=True)
+xvals = np.linspace(min(durations), max(durations), 100)
+plt.plot(xvals, w.pdf(xvals))
+plt.show()
