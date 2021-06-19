@@ -13,17 +13,33 @@ t_end = 60*8
 entrance_rate_constant = 1000
 
 ###### Constant Entry Rate
+# def entrance_rate(t):
+#     if t < t0:
+#         return 0
+#     return entrance_rate_constant
+# def entrance_rate_integral(t):
+#     if t < t0:
+#         return 0
+#     return entrance_rate_constant * (t - t0)
+# def entrance_rate_integral_inverse(y):
+#     assert y >= 0
+#     return y / entrance_rate_constant + t0
+
+###### Sinusoidal Varying Entry Rate
+a = 0.9 * entrance_rate_constant
+period = 80
+freq = 1/period
+omega = 2*np.pi * freq
 def entrance_rate(t):
     if t < t0:
         return 0
-    return entrance_rate_constant
+    return entrance_rate_constant + a * np.cos(omega * t)
 def entrance_rate_integral(t):
     if t < t0:
         return 0
-    return entrance_rate_constant * (t - t0)
-def entrance_rate_integral_inverse(y):
-    assert y >= 0
-    return y / entrance_rate_constant + t0
+    return entrance_rate_constant * t + a / omega * np.sin(omega * t)
+entrance_rate_integral_inverse = None
+
 
 ########### Set up time distribution
 scale = 42.59286560661815 # scale parameter of Weibull distribution
@@ -50,7 +66,7 @@ sim = FreshPondSim(distance=2.5,
 
 
 t = 60*8-10
-n_reps = 5
+n_reps = 1
 
 times = []
 
@@ -61,7 +77,6 @@ for _ in tqdm(range(n_reps - 1)):
     times.extend(t - p.start_time for p in sim.get_pedestrians_at_time(t))
 
 times = np.array(times)
-
 
 
 
