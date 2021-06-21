@@ -119,15 +119,43 @@ class BoundedInterpolator:
 
 
 class DynamicBoundedInterpolator:
-    def __init__(self, func, x_min, x_max, resolution, expand_factor=2.0, debug=False):
-        self._func = func
+    def __init__(self, func, x1, x2, resolution, x_min=None, x_max=None, expand_factor=2.0, debug=False):
+        assert x1 <= x2
+
+        if x_min is not None:
+            assert x1 >= x_min
+            x_min = float(x_min)
+        self._x_min = x_min
+        if x_max is not None:
+            assert x2 <= x_max
+            x_max = float(x_max)
+        self._x_max = x_max
+
         self._dx = float(resolution)
-        self._expand_factor = expand_factor
-        self._x1 = float(x_min)
-        self._x2 = float(x_min)
+        self._x1 = float(x1)
+        self._x2 = float(x1)
+        self._expand_factor = float(expand_factor)
+
+        self._func = func
         self._data = deque([self._func(self._x2)])
         self._debug = debug
-        self._expand_right(x_max)
+        
+        self._at_min = False
+        self._left_val = None
+        if self._x_min is not None:
+            self._at_min = self._x1 - self._x_min < self._dx
+            if self._at_min:
+                self._left_val = self._func(self._x_min)
+
+        self._at_max = False
+        self._right_val = None
+        if self._x_max is not None:
+            self._at_max = self._x_max - self._x2 < self._dx
+            if self._at_max:
+                self._right_val = self._func(self._x_max)
+
+        if x2 > x1:
+            self._expand_right(x2)
 
         # vectorized function so it can take ndarrays
         self._vf = np.vectorize(self._eval, otypes=[float])
@@ -139,7 +167,17 @@ class DynamicBoundedInterpolator:
             print(f"Expanding right, current x2: {self._x2}")
             t = time()
 
+        if self._x_max is not None and x_max > self._x_max:
+            x_max = self._x_max
         n_new_samples = math.ceil((x_max - self._x2) / self._dx)
+        if self._x_max is not None:
+            upper = self._x2 + n_new_samples * self._dx
+            if upper >= self._x_max:
+                if upper > self._x_max:
+                    n_new_samples -= 1
+                    self._right_val = self._func(self._x_max)
+                self._at_max = True
+
         self._data.extend([
             self._func(self._x2 + i * self._dx)
             for i in range(1, n_new_samples + 1)
@@ -156,7 +194,17 @@ class DynamicBoundedInterpolator:
             print(f"Expanding left, current x1: {self._x1}")
             t = time()
 
+        if self._x_min is not None and x_min < self._x_min:
+            x_min = self._x_min
         n_new_samples = math.ceil((self._x1 - x_min) / self._dx)
+        if self._x_min is not None:
+            lower = self._x1 - n_new_samples * self._dx
+            if lower <= self._x_min:
+                if lower < self._x_min:
+                    n_new_samples -= 1
+                    self._left_val = self._func(self._x_min)
+                self._at_min = True
+
         self._data.extendleft([
             self._func(self._x1 - i * self._dx)
             for i in range(1, n_new_samples + 1)
@@ -172,7 +220,14 @@ class DynamicBoundedInterpolator:
         return self._eval(x)
 
     def _eval(self, x):
-        if x < self._x1:
+        if self._x_min is not None and x < self._x_min:
+            raise ValueError(
+                f"{x} is below interpolation lower limit of {self._x_min}")
+        elif self._x_max is not None and x > self._x_max:
+            raise ValueError(
+                f"{x} is above interpolation upper limit of {self._x_max}")
+
+        if (not self._at_min) and x < self._x1:
             diff = self._x1 - x
             threshold = (self._x2 - self._x1) * (self._expand_factor - 1)
             if diff <= threshold:
@@ -180,7 +235,7 @@ class DynamicBoundedInterpolator:
             else:
                 new_x1 = self._x1 - self._expand_factor * diff
             self._expand_left(new_x1)
-        elif x > self._x2:
+        elif (not self._at_max) and x > self._x2:
             diff = x - self._x2
             threshold = (self._x2 - self._x1) * (self._expand_factor - 1)
             if diff <= threshold:
@@ -188,6 +243,19 @@ class DynamicBoundedInterpolator:
             else:
                 new_x2 = self._x2 + self._expand_factor * diff
             self._expand_right(new_x2)
+
+        if x < self._x1:
+            lval = self._left_val
+            rval = self._data[0]
+            ldiff = (x - self._x_min) / (self._x1 - self._x_min)
+            rdiff = 1 - ldiff
+            return lval * rdiff + rval * ldiff
+        if x > self._x2:
+            lval = self._data[-1]
+            rval = self._right_val
+            ldiff = (x - self._x2) / (self._x_max - self._x2)
+            rdiff = 1 - ldiff
+            return lval * rdiff + rval * ldiff
 
         pos = (x - self._x1) / self._dx
         k = int(pos)
@@ -201,6 +269,7 @@ class DynamicBoundedInterpolator:
             ldiff = pos - k
             rdiff = 1 - ldiff
             return lval * rdiff + rval * ldiff
+
 
 if __name__ == '__main__':
     func = lambda x: 2 * x

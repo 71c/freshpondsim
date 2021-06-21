@@ -142,9 +142,28 @@ def test_dynamic_5():
     print(i._x1, i._x2)
 
 
+def test_dynamic_6():
+    # f = math.sqrt
+    # i = DynamicBoundedInterpolator(f, 0, 3, 1, x_max=5, expand_factor=2, debug=False)
+    # print(i(4))
+
+    f = math.sqrt
+    i = DynamicBoundedInterpolator(f, 2, 4, 2, x_min=0, x_max=6, expand_factor=2, debug=False)
+    print(i(5.5), i._right_val)
+    print(i._data)
+
+    # print(i._x_min, i._x_max, i._x1, i._x2)
+    # print(i(0.5))
+    
+    # print(i._x_min, i._x_max, i._x1, i._x2)
+    # print(i._data)
+
+
 if __name__ == '__main__':
-    # test_dynamic_1()
-    # test_dynamic_3()
-    # test_dynamic_4()
+    test_dynamic_1()
+    test_dynamic_3()
+    test_dynamic_4()
 
     test_dynamic_5()
+
+    test_dynamic_6()
