@@ -411,7 +411,6 @@ class FreshPondSim:
                          self.entrance_rate_integral,
                          self.entrance_rate_integral_inverse))
         n_pedestrians = len(start_times)
-        # print(n_pedestrians)
         entrances = random.choices(population=self.entrances,
                                    weights=self.entrance_weights,
                                    k=n_pedestrians)
