@@ -27,7 +27,7 @@ class UnboundedInterpolator:
         return self._keys[-1]
 
     def __call__(self, x):
-        if type(x) is np.ndarray:
+        if type(x) is np.ndarray or type(x) is list:
             return self._vf(x)
         return self._eval(x)
 
@@ -96,7 +96,7 @@ class BoundedInterpolator:
         print("After:", self._interval)
 
     def __call__(self, x):
-        if type(x) is np.ndarray:
+        if type(x) is np.ndarray or type(x) is list:
             return self._vf(x)
         return self._eval(x)
 
@@ -121,16 +121,16 @@ class BoundedInterpolator:
 class DynamicBoundedInterpolator:
     def __init__(self, func, x_min, x_max, resolution, expand_factor=2.0, debug=False):
         self._func = func
-        self._dx = resolution
+        self._dx = float(resolution)
         self._expand_factor = expand_factor
-        self._x1 = x_min
-        self._x2 = x_min
+        self._x1 = float(x_min)
+        self._x2 = float(x_min)
         self._data = deque([self._func(self._x2)])
         self._debug = debug
         self._expand_right(x_max)
 
         # vectorized function so it can take ndarrays
-        self._vf = np.vectorize(self._eval)
+        self._vf = np.vectorize(self._eval, otypes=[float])
 
     def _expand_right(self, x_max):
         """Expands the domain of the function to include at least x_max"""
@@ -167,16 +167,26 @@ class DynamicBoundedInterpolator:
             print(f"new x1: {self._x1}, took {time() - t:.6f} seconds")
 
     def __call__(self, x):
-        if type(x) is np.ndarray:
+        if type(x) is np.ndarray or type(x) is list:
             return self._vf(x)
         return self._eval(x)
 
     def _eval(self, x):
-        if x <= self._x1:
-            new_x1 = self._x1 + self._expand_factor * (x - self._x1)
+        if x < self._x1:
+            diff = self._x1 - x
+            threshold = (self._x2 - self._x1) * (self._expand_factor - 1)
+            if diff <= threshold:
+                new_x1 = self._x1 - threshold
+            else:
+                new_x1 = self._x1 - self._expand_factor * diff
             self._expand_left(new_x1)
-        elif x >= self._x2:
-            new_x2 = self._x2 + self._expand_factor * (x - self._x2)
+        elif x > self._x2:
+            diff = x - self._x2
+            threshold = (self._x2 - self._x1) * (self._expand_factor - 1)
+            if diff <= threshold:
+                new_x2 = self._x2 + threshold
+            else:
+                new_x2 = self._x2 + self._expand_factor * diff
             self._expand_right(new_x2)
 
         pos = (x - self._x1) / self._dx
@@ -194,27 +204,43 @@ class DynamicBoundedInterpolator:
 
 if __name__ == '__main__':
     func = lambda x: 2 * x
-    intpu = UnboundedInterpolator(func, 1, True)
-    print(intpu(3))
-    print(intpu(3.1))
-    print(intpu(3.2))
-    print(intpu(3.5))
-    print(intpu(3.4))
-    print(intpu(10))
-    print(intpu(8))
-    print(intpu(9))
-    print(intpu(12))
-    print(intpu(11))
-    print(intpu(3.33))
 
-    intpb = BoundedInterpolator(func, -20, 20, 1.0)
-    print(7, intpb(7))
-    print(3.3, intpb(3.3))
-    print(3.33, intpb(3.33))
 
-    intpd = DynamicBoundedInterpolator(func, -20, -20, 1.0)
-    print(intpd(7))
-    print(intpd(7.5))
-    print(intpd(21))
+    # intpu = UnboundedInterpolator(func, 1, True)
+    # print(intpu(3))
+    # print(intpu(3.1))
+    # print(intpu(3.2))
+    # print(intpu(3.5))
+    # print(intpu(3.4))
+    # print(intpu(10))
+    # print(intpu(8))
+    # print(intpu(9))
+    # print(intpu(12))
+    # print(intpu(11))
+    # print(intpu(3.33))
+
+    # intpb = BoundedInterpolator(func, -20, 20, 1.0)
+    # print(7, intpb(7))
+    # print(3.3, intpb(3.3))
+    # print(3.33, intpb(3.33))
+
+    # intpd = DynamicBoundedInterpolator(func, -20, -20, 1.0)
+    # print(intpd(7))
+    # print(intpd(7.5))
+    # print(intpd(21))
+
+    # intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0)
+    # print(7, intpd(7))
+    # print(3.3, intpd(3.3))
+    # print(3.33, intpd(3.33))
+
+    # intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0, debug=True)
+    # print(intpd(20))
+
+    intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0, debug=True)
+    for x in range(-20, 20):
+        print(intpd(x+0.01))
+    print(intpd(1000.392))
+
 
     # BoundedInterpolator gives slight round-off errors which is a shame

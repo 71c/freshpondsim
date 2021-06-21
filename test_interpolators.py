@@ -2,6 +2,7 @@ from function_interpolator import BoundedInterpolator, DynamicBoundedInterpolato
 import numpy as np
 from tictoc import *
 import math
+import timeit
 
 
 def assert_isclose(a, b, rel_tol=1e-9):
@@ -68,10 +69,82 @@ def test_dynamic_2():
         assert_isclose(i4(x), f(x), rel_tol=rel_tol)
     tocl()
 
-    # print(i4._data[-10])
-    # print(i3._data[-10])
+
+def test_dynamic_3():
+    f = lambda x: x + x * x
+
+    a, b = 0, 1000
+    res = 0.1
+    step = 0.103
+    expand_factor = 2.0
+    rel_tol = 1e-1
+
+    def always_expanding_up():
+        i1 = DynamicBoundedInterpolator(f, a, a, res, expand_factor=expand_factor, debug=False)
+        for x in np.arange(a, b, step):
+            assert_isclose(i1(x), f(x), rel_tol=rel_tol)
+    t = timeit.timeit(always_expanding_up, number=100)
+    print(f'{a} to {b}, always expanding: {t}')
+
+    def already_expanded_up():
+        i2 = DynamicBoundedInterpolator(f, a, a, res, expand_factor=expand_factor, debug=False)
+        i2((a + b) / 2)
+        for x in np.arange(a, b, step):
+            assert_isclose(i2(x), f(x), rel_tol=rel_tol)
+    t = timeit.timeit(already_expanded_up, number=100)
+    print(f'{a} to {b}, already expanded: {t}')
+
+    def always_expanding_down():
+        i3 = DynamicBoundedInterpolator(f, b, b, res, expand_factor=expand_factor, debug=False)    
+        for x in np.arange(b, a, -step):
+            assert_isclose(i3(x), f(x), rel_tol=rel_tol)
+    t = timeit.timeit(always_expanding_down, number=100)
+    print(f'{b} to {a}, always expanding: {t}')
+
+    def already_expanded_down():
+        i4 = DynamicBoundedInterpolator(f, b, b, res, expand_factor=expand_factor, debug=False)
+        i4((a + b) / 2)
+        for x in np.arange(b, a, -step):
+            assert_isclose(i4(x), f(x), rel_tol=rel_tol)
+    t = timeit.timeit(already_expanded_down, number=100)
+    print(f'{b} to {a}, already expanded: {t}')
+
+
+def test_dynamic_4():
+    f = lambda x: x + x * x
+
+    a, b = 0, 1000
+    res = 0.1
+    expand_factor = 2.0
+    rel_tol = 1e-1
+
+    def test():
+        i5 = DynamicBoundedInterpolator(f, b, b, res, expand_factor=expand_factor, debug=False)
+        for x in np.logspace(0, 4, base=10, num=5):
+            assert_isclose(i5(x), f(x), rel_tol=rel_tol)
+    t = timeit.timeit(test, number=100)
+    print(f'test: {t}')
+
+
+def test_dynamic_5():
+    f = lambda x: x
+
+    a, b = 0, 1000
+    res = 1
+    expand_factor = 2
+    rel_tol = 1e-1
+
+    i = DynamicBoundedInterpolator(f, a, b, res, expand_factor=expand_factor, debug=False)
+    ar = ([0, 1, 2, 3, 0.5, 0.9, 1.8])
+    print(type(i(5.0)))
+    print(type(i(ar)[0]))
+    print(i([0.5, 0.8]))
+    print(i._x1, i._x2)
 
 
 if __name__ == '__main__':
-    test_dynamic_1()
-    test_dynamic_2()
+    # test_dynamic_1()
+    # test_dynamic_3()
+    # test_dynamic_4()
+
+    test_dynamic_5()

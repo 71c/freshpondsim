@@ -54,7 +54,7 @@ class InOutTheory:
     
     def approx_expected_n_people_2(self, t):
         return self.expected_entrances_in_interval(t - self._mean_duration, t)
-    
+
     def approx_expected_n_people_3(self, t):
         k1 = self._time_constant - self._mean_duration/2
         k2 = k1 + self._mean_duration
@@ -141,18 +141,18 @@ if __name__ == "__main__":
     entrance_rate_constant = 2
 
     ### Sinusoidal Entry Rate
-    a = 0.95 * entrance_rate_constant
-    period = 60*24
-    freq = 1/period
-    omega = 2*np.pi * freq
-    def entrance_rate(q):
-        if q < 0:
-            return 0.0
-        return entrance_rate_constant + a * np.cos(omega * q)
-    def entrance_rate_integral(q):
-        if q < 0:
-            return 0.0
-        return entrance_rate_constant * q + a / omega * np.sin(omega * q)
+    # a = 0.95 * entrance_rate_constant
+    # period = 60*24
+    # freq = 1/period
+    # omega = 2*np.pi * freq
+    # def entrance_rate(q):
+    #     if q < 0:
+    #         return 0.0
+    #     return entrance_rate_constant + a * np.cos(omega * q)
+    # def entrance_rate_integral(q):
+    #     if q < 0:
+    #         return 0.0
+    #     return entrance_rate_constant * q + a / omega * np.sin(omega * q)
 
     # ### Constant Entry Rate
     # def entrance_rate(t):
@@ -175,25 +175,32 @@ if __name__ == "__main__":
     #         return 0
     #     return entrance_rate_constant * t + 0.5 * lambda_increase_rate * t**2
 
+    from simulation_defaults import _get_default_day_rate_func
+    entrance_rate = _get_default_day_rate_func()
+    entrance_rate_integral = None
+
     scale = 42.59286560661815 # scale parameter of Weibull distribution
     k = 1.5513080437971483 # shape parameter of weibull distribution
     duration_dist = scipy.stats.weibull_min(k, scale=scale)
 
     iot = InOutTheory(duration_dist, entrance_rate, entrance_rate_integral)
 
-    tvals = np.linspace(0, 60*24 * 2, num=200)
-    # tvals = np.linspace(0, 144, num=50)
+    tvals = np.linspace(0, 60*24 * 2, num=100)
 
     tvals_hours = tvals / 60
 
+    pr = cProfile.Profile()
+    pr.enable()
+
     plt.plot(tvals_hours, iot.expected_n_people(tvals), label='$n(t)$ expected num people')
-    # plt.plot(tvals, iot.approx_expected_n_people_1(tvals), label='$n_{approx1}(t)$')
-    # plt.plot(tvals, iot.approx_expected_n_people_2(tvals), label='$n_{approx2}(t)$')
-    # plt.plot(tvals, iot.approx_expected_n_people_3(tvals), label='$n_{approx3}(t)$')
+    # approximations to n
+    # plt.plot(tvals_hours, iot.approx_expected_n_people_1(tvals), label='$n_{approx1}(t)$')
+    # plt.plot(tvals_hours, iot.approx_expected_n_people_2(tvals), label='$n_{approx2}(t)$')
+    # plt.plot(tvals_hours, iot.approx_expected_n_people_3(tvals), label='$n_{approx3}(t)$')
     plt.xlabel('time (hours)')
     plt.ylabel('people')
     plt.legend()
-    
+
     plt.figure()
     plt.plot(tvals_hours, iot.entrance_rate(tvals), label='$\\lambda(t)$ entrance rate')
     plt.plot(tvals_hours, iot.exit_rate(tvals), label='$e(t)$ exit rate')
@@ -212,5 +219,8 @@ if __name__ == "__main__":
     plt.xlabel('time (hours)')
     plt.ylabel('duration (minutes)')
     plt.legend()
+
+    pr.disable()
+    pr.print_stats(sort='cumulative')
 
     plt.show()
