@@ -1,16 +1,36 @@
 from scipy import integrate
 import numpy as np
 import scipy.stats
+from function_interpolator import DynamicBoundedInterpolator
 
 
 class InOutTheory:
     def __init__(self, duration_dist, entrance_rate,
-                 cumulative_entrance_rate=None):
+                 cumulative_entrance_rate=None,
+                 interpolate_entrance_rate=False,
+                 interpolate_cumulative_entrance_rate=False,
+                 interpolate_duration_pdf=False,
+                 interpolate_duration_sf=False,
+                 time_res=None, duration_res=None):
+        
         assert isinstance(duration_dist,
                           scipy.stats._distn_infrastructure.rv_frozen)
+
+        if interpolate_entrance_rate or interpolate_cumulative_entrance_rate:
+            if time_res is None:
+                raise ValueError("Specify time_res for interpolation of entrance rate or cumulative entrance rate")
+        
+        if interpolate_duration_pdf or interpolate_duration_sf:
+            if duration_res is None:
+                raise ValueError("Specify duration_res for interpolation of duration pdf or sf")
+
         self.T = duration_dist
 
-        self.entrance_rate = np.vectorize(entrance_rate, otypes=[float])
+        if interpolate_entrance_rate:
+            self.entrance_rate = DynamicBoundedInterpolator(entrance_rate,
+                        x1=0, x2=0, resolution=time_res, x_min=0, x_max=None)
+        else:
+            self.entrance_rate = np.vectorize(entrance_rate, otypes=[float])
 
         if cumulative_entrance_rate is None:
             def integral_func(t):
@@ -18,14 +38,30 @@ class InOutTheory:
                     return 0
                 y, abserr = integrate.quad(entrance_rate, 0, t)
                 return y
-            self.cumulative_entrance_rate = np.vectorize(integral_func, otypes=[float])
+            if interpolate_cumulative_entrance_rate:
+                self.cumulative_entrance_rate = DynamicBoundedInterpolator(integral_func, x1=0, x2=0, resolution=time_res, x_min=0, x_max=None)
+            else:
+                self.cumulative_entrance_rate = np.vectorize(integral_func, otypes=[float])
             self._closedform_cumulative_entrance_rate = False
         else:
-            self.cumulative_entrance_rate = np.vectorize(cumulative_entrance_rate, otypes=[float])
+            if interpolate_cumulative_entrance_rate:
+                self.cumulative_entrance_rate = DynamicBoundedInterpolator(cumulative_entrance_rate, x1=0, x2=0, resolution=time_res, x_min=0, x_max=None)
+            else:
+                self.cumulative_entrance_rate = np.vectorize(cumulative_entrance_rate, otypes=[float])
             self._closedform_cumulative_entrance_rate = True
 
         self.lamda = self.entrance_rate
         self.Lamda = self.cumulative_entrance_rate
+
+        if interpolate_duration_pdf:
+            self._pdf = DynamicBoundedInterpolator(self.T.pdf, x1=0, x2=0, resolution=duration_res, x_min=0, x_max=None)
+        else:
+            self._pdf = self.T.pdf
+        
+        if interpolate_duration_sf:
+            self._sf = DynamicBoundedInterpolator(self.T.sf, x1=0, x2=0, resolution=duration_res, x_min=0, x_max=None)
+        else:
+            self._sf = self.T.sf
 
         self._mean_duration = self.T.mean()
         self._mean_square_duration = self.T.var() + self._mean_duration**2
@@ -46,12 +82,12 @@ class InOutTheory:
         if t < 0:
             return 0.0
         y, abserr = integrate.quad(
-            lambda u: self.T.sf(u) * self.entrance_rate(t - u), 0, t)
+            lambda u: self._sf(u) * self.entrance_rate(t - u), 0, t)
         return y
 
     def approx_expected_n_people_1(self, t):
         return self._mean_duration * self.entrance_rate(t - self._time_constant)
-    
+
     def approx_expected_n_people_2(self, t):
         return self.expected_entrances_in_interval(t - self._mean_duration, t)
 
@@ -64,7 +100,7 @@ class InOutTheory:
         if t < 0:
             return 0.0
         y, abserr = integrate.quad(
-            lambda u: self.T.pdf(u) * self.entrance_rate(t - u), 0, t)
+            lambda u: self._pdf(u) * self.entrance_rate(t - u), 0, t)
         return y
 
     def cumulative_exit_rate(self, t):
@@ -76,7 +112,7 @@ class InOutTheory:
     def duration_so_far_density(self, t):
         n_t = self.expected_n_people(t)
         return np.vectorize(lambda x: 0 if x < 0 else
-            self.entrance_rate(t - x) * self.T.sf(x) / n_t)
+            self.entrance_rate(t - x) * self._sf(x) / n_t)
 
     def expected_duration_so_far(self, t):
         assert t >= 0
@@ -84,7 +120,7 @@ class InOutTheory:
             return 0.0
         n_t = self.expected_n_people(t)
         y, abserr = integrate.quad(
-            lambda x: x * self.entrance_rate(t - x) * self.T.sf(x), 0, t)
+            lambda x: x * self.entrance_rate(t - x) * self._sf(x), 0, t)
         return y / n_t
 
     def expected_entrances_in_interval(self, t1, t2):
@@ -98,10 +134,10 @@ class InOutTheory:
     def duration_observed_density(self, t):
         assert t >= 0
         if t == 0:
-            return self.T.pdf
+            return self._pdf
         n_t = self.expected_n_people(t)
         def pdf(x):
-            return self.T.pdf(x) * self.expected_entrances_in_interval(t - x, t) / n_t
+            return self._pdf(x) * self.expected_entrances_in_interval(t - x, t) / n_t
         return pdf
 
     def expected_duration_observed(self, t):
@@ -113,10 +149,10 @@ class InOutTheory:
         return y
 
     def duration_so_far_steady_state_density(self, x):
-        return self.T.sf(x) / self._mean_duration
+        return self._sf(x) / self._mean_duration
 
     def duration_observed_steady_state_density(self, x):
-        return x * self.T.pdf(x) / self._mean_duration
+        return x * self._pdf(x) / self._mean_duration
 
     def duration_observed_steady_state_mean(self):
         return self._mean_duration_observed
@@ -126,7 +162,7 @@ class InOutTheory:
 
     def change_in_n_people_rv(self, t1, t2):
         dt = t2 - t1
-        integrand = lambda u: self.T.sf(u) * self.entrance_rate(t2 - u)
+        integrand = lambda u: self._sf(u) * self.entrance_rate(t2 - u)
         nlambda, abserr = integrate.quad(integrand, 0, dt)
         tmp, abserr = integrate.quad(integrand, dt, t2)
         ne = self.expected_n_people(t1) - tmp
@@ -141,18 +177,18 @@ if __name__ == "__main__":
     entrance_rate_constant = 2
 
     ### Sinusoidal Entry Rate
-    # a = 0.95 * entrance_rate_constant
-    # period = 60*24
-    # freq = 1/period
-    # omega = 2*np.pi * freq
-    # def entrance_rate(q):
-    #     if q < 0:
-    #         return 0.0
-    #     return entrance_rate_constant + a * np.cos(omega * q)
-    # def entrance_rate_integral(q):
-    #     if q < 0:
-    #         return 0.0
-    #     return entrance_rate_constant * q + a / omega * np.sin(omega * q)
+    a = 0.95 * entrance_rate_constant
+    period = 60*24
+    freq = 1/period
+    omega = 2*np.pi * freq
+    def entrance_rate(q):
+        if q < 0:
+            return 0.0
+        return entrance_rate_constant + a * np.cos(omega * q)
+    def entrance_rate_integral(q):
+        if q < 0:
+            return 0.0
+        return entrance_rate_constant * q + a / omega * np.sin(omega * q)
 
     # ### Constant Entry Rate
     # def entrance_rate(t):
@@ -175,22 +211,25 @@ if __name__ == "__main__":
     #         return 0
     #     return entrance_rate_constant * t + 0.5 * lambda_increase_rate * t**2
 
-    from simulation_defaults import _get_default_day_rate_func
-    entrance_rate = _get_default_day_rate_func()
-    entrance_rate_integral = None
+    # from simulation_defaults import _get_default_day_rate_func
+    # entrance_rate = _get_default_day_rate_func()
+    # entrance_rate_integral = None
 
     scale = 42.59286560661815 # scale parameter of Weibull distribution
     k = 1.5513080437971483 # shape parameter of weibull distribution
     duration_dist = scipy.stats.weibull_min(k, scale=scale)
 
-    iot = InOutTheory(duration_dist, entrance_rate, entrance_rate_integral)
+    iot = InOutTheory(duration_dist, entrance_rate, entrance_rate_integral,
+                        interpolate_duration_pdf=False, interpolate_duration_sf=False,
+                        interpolate_entrance_rate=False, interpolate_cumulative_entrance_rate=False, time_res=0.5)
 
     tvals = np.linspace(0, 60*24 * 2, num=100)
 
     tvals_hours = tvals / 60
 
-    pr = cProfile.Profile()
-    pr.enable()
+    # pr = cProfile.Profile()
+    # pr.enable()
+    tic()
 
     plt.plot(tvals_hours, iot.expected_n_people(tvals), label='$n(t)$ expected num people')
     # approximations to n
@@ -220,7 +259,8 @@ if __name__ == "__main__":
     plt.ylabel('duration (minutes)')
     plt.legend()
 
-    pr.disable()
-    pr.print_stats(sort='cumulative')
+    tocl()
+    # pr.disable()
+    # pr.print_stats(sort='tottime')
 
     plt.show()

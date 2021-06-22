@@ -244,18 +244,20 @@ class DynamicBoundedInterpolator:
                 new_x2 = self._x2 + self._expand_factor * diff
             self._expand_right(new_x2)
 
-        if x < self._x1:
-            lval = self._left_val
-            rval = self._data[0]
-            ldiff = (x - self._x_min) / (self._x1 - self._x_min)
-            rdiff = 1 - ldiff
-            return lval * rdiff + rval * ldiff
-        if x > self._x2:
-            lval = self._data[-1]
-            rval = self._right_val
-            ldiff = (x - self._x2) / (self._x_max - self._x2)
-            rdiff = 1 - ldiff
-            return lval * rdiff + rval * ldiff
+        if self._at_min:
+            if x < self._x1:
+                lval = self._left_val
+                rval = self._data[0]
+                ldiff = (x - self._x_min) / (self._x1 - self._x_min)
+                rdiff = 1 - ldiff
+                return lval * rdiff + rval * ldiff
+        if self._at_max:
+            if x > self._x2:
+                lval = self._data[-1]
+                rval = self._right_val
+                ldiff = (x - self._x2) / (self._x_max - self._x2)
+                rdiff = 1 - ldiff
+                return lval * rdiff + rval * ldiff
 
         pos = (x - self._x1) / self._dx
         k = int(pos)
@@ -269,6 +271,7 @@ class DynamicBoundedInterpolator:
             ldiff = pos - k
             rdiff = 1 - ldiff
             return lval * rdiff + rval * ldiff
+
 
 
 if __name__ == '__main__':
@@ -306,10 +309,20 @@ if __name__ == '__main__':
     # intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0, debug=True)
     # print(intpd(20))
 
-    intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0, debug=True)
-    for x in range(-20, 20):
-        print(intpd(x+0.01))
-    print(intpd(1000.392))
+    # intpd = DynamicBoundedInterpolator(func, -20, 20, 1.0, debug=True)
+    # for x in range(-20, 20):
+    #     print(intpd(x+0.01))
+    # print(intpd(1000.392))
 
 
     # BoundedInterpolator gives slight round-off errors which is a shame
+
+
+    import matplotlib.pyplot as plt
+    
+    f = np.exp
+
+    i = DynamicBoundedInterpolator(f, x1=0, x2=0, resolution=1.0, x_min=None, x_max=None)
+    x = np.linspace(-5, 5, num=500)
+    plt.plot(x, i(x))
+    plt.show()
