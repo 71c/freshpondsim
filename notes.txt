@@ -73,3 +73,9 @@ cov(X, T) = Var(X) E[1/V]
 
 cov(T, V) = (1 - E[1/V] E[V]) E[X]
           = (1 - exp(σv^2)) exp(µx + σx^2 / 2)
+
+
+
+
+
+https://math.stackexchange.com/questions/228844/integral-of-a-homogeneous-poisson-process#228875

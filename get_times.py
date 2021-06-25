@@ -12,10 +12,10 @@ from tqdm import tqdm
 
 
 
-t0 = 0
-t_end = 20
+t0 = 0.0
+t_end = 20.0
 
-multiplier = 4
+multiplier = 4.0
 
 def entrance_rate(t):
     if t < t0:
@@ -104,7 +104,8 @@ mean_times_v4 = np.empty(n_trials)
 for i in tqdm(range(n_trials)):
     entrance_times, exit_times = [], []
     while len(entrance_times) < 20 or len(exit_times) < 20:
-        t1 = np.random.uniform(t0, t_end)
+        # t1 = np.random.uniform(t0, t_end)
+        t1 = t0
         t2 = np.random.uniform(t1, t_end)
         entrance_times, exit_times = sim.get_enter_and_exit_times_in_interval(t1, t2)
         
@@ -120,14 +121,15 @@ for i in tqdm(range(n_trials)):
 
 for name, samples in [('v1', mean_times_v1), ('v2', mean_times_v2), ('v3', mean_times_v3), ('v4', mean_times_v4)]:
     avg = np.mean(samples)
-    rmse = np.sqrt(np.mean((samples - mean_time)**2))
-    print(f"{name}: Average: {avg:.3f}, RMSE: {rmse:.3f}")
+    # rmse = np.sqrt(np.mean((samples - mean_time)**2))
+    mae = np.mean(np.abs(samples - mean_time))
+    print(f"{name}: Average: {avg:.3f}, MAE: {mae:.3f}")
 
 
 
 
 
-t1 = 7.0 # first time point to sample
-t2 = 14.0 # second time point to sample
-entrance_times, exit_times = sim.get_enter_and_exit_times_in_interval(t1, t2)
-est_mean_time = estimate_mean_time_v1(sim, entrance_times, exit_times, t1, t2)
+# t1 = 7.0 # first time point to sample
+# t2 = 14.0 # second time point to sample
+# entrance_times, exit_times = sim.get_enter_and_exit_times_in_interval(t1, t2)
+# est_mean_time = estimate_mean_time_v1(sim, entrance_times, exit_times, t1, t2)

@@ -2,17 +2,19 @@ from scipy import integrate
 import numpy as np
 import scipy.stats
 from function_interpolator import DynamicBoundedInterpolator
+from freshpondsim import random_times
 
 
 class InOutTheory:
     def __init__(self, duration_dist, entrance_rate,
                  cumulative_entrance_rate=None,
+                 cumulative_entrance_rate_inverse=None,
                  interpolate_entrance_rate=False,
                  interpolate_cumulative_entrance_rate=False,
                  interpolate_duration_pdf=False,
                  interpolate_duration_sf=False,
                  time_res=None, duration_res=None):
-        
+
         assert isinstance(duration_dist,
                           scipy.stats._distn_infrastructure.rv_frozen)
 
@@ -25,6 +27,8 @@ class InOutTheory:
                 raise ValueError("Specify duration_res for interpolation of duration pdf or sf")
 
         self.T = duration_dist
+
+        self.cumulative_entrance_rate_inverse = cumulative_entrance_rate_inverse
 
         if interpolate_entrance_rate:
             self.entrance_rate = DynamicBoundedInterpolator(entrance_rate,
@@ -168,6 +172,27 @@ class InOutTheory:
         ne = self.expected_n_people(t1) - tmp
         return scipy.stats.skellam(nlambda, ne)
 
+    def cumulative_n_people(self, t):
+        if self._closedform_cumulative_entrance_rate:
+            y, abserr = integrate.quad(lambda u: self._sf(u) * self.Lamda(t - u), 0, t)
+            return y
+        return self.n_integral(0, t)
+
+    def n_integral(self, t1, t2):
+        if self._closedform_cumulative_entrance_rate:
+            return self.cumulative_n_people(t2) - self.cumulative_n_people(t1)
+        y, abserr = integrate.dblquad(lambda tau, u: self._sf(tau) * self.lamda(u - tau), t1, t2, lambda u: 0, lambda u: u)
+        return y
+
+    def sample_realization(self, end_time):
+        cum_entrance_rate = self.cumulative_entrance_rate if self._closedform_cumulative_entrance_rate else None
+        entrance_times = np.array(list(
+            random_times(0, end_time, self.entrance_rate, cum_entrance_rate,
+                         self.cumulative_entrance_rate_inverse)
+        ))
+        exit_times = entrance_times + self.T.rvs(entrance_times.shape)
+        return entrance_times, exit_times
+
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
@@ -177,18 +202,18 @@ if __name__ == "__main__":
     entrance_rate_constant = 2
 
     ### Sinusoidal Entry Rate
-    a = 0.95 * entrance_rate_constant
-    period = 60*24
-    freq = 1/period
-    omega = 2*np.pi * freq
-    def entrance_rate(q):
-        if q < 0:
-            return 0.0
-        return entrance_rate_constant + a * np.cos(omega * q)
-    def entrance_rate_integral(q):
-        if q < 0:
-            return 0.0
-        return entrance_rate_constant * q + a / omega * np.sin(omega * q)
+    # a = 0.95 * entrance_rate_constant
+    # period = 60*24
+    # freq = 1/period
+    # omega = 2*np.pi * freq
+    # def entrance_rate(q):
+    #     if q < 0:
+    #         return 0.0
+    #     return entrance_rate_constant + a * np.cos(omega * q)
+    # def entrance_rate_integral(q):
+    #     if q < 0:
+    #         return 0.0
+    #     return entrance_rate_constant * q + a / omega * np.sin(omega * q)
 
     # ### Constant Entry Rate
     # def entrance_rate(t):
@@ -211,9 +236,9 @@ if __name__ == "__main__":
     #         return 0
     #     return entrance_rate_constant * t + 0.5 * lambda_increase_rate * t**2
 
-    # from simulation_defaults import _get_default_day_rate_func
-    # entrance_rate = _get_default_day_rate_func()
-    # entrance_rate_integral = None
+    from simulation_defaults import _get_default_day_rate_func
+    entrance_rate = _get_default_day_rate_func()
+    entrance_rate_integral = None
 
     scale = 42.59286560661815 # scale parameter of Weibull distribution
     k = 1.5513080437971483 # shape parameter of weibull distribution
@@ -221,15 +246,16 @@ if __name__ == "__main__":
 
     iot = InOutTheory(duration_dist, entrance_rate, entrance_rate_integral,
                         interpolate_duration_pdf=False, interpolate_duration_sf=False,
-                        interpolate_entrance_rate=False, interpolate_cumulative_entrance_rate=False, time_res=0.5)
+                        interpolate_entrance_rate=False, interpolate_cumulative_entrance_rate=False)
 
-    tvals = np.linspace(0, 60*24 * 2, num=100)
+    tvals = np.linspace(0, 60*24 * 2, num=400)
+    # tvals = np.linspace(0, 500, num=40)
 
     tvals_hours = tvals / 60
 
     # pr = cProfile.Profile()
     # pr.enable()
-    tic()
+    # tic()
 
     plt.plot(tvals_hours, iot.expected_n_people(tvals), label='$n(t)$ expected num people')
     # approximations to n
@@ -259,7 +285,7 @@ if __name__ == "__main__":
     plt.ylabel('duration (minutes)')
     plt.legend()
 
-    tocl()
+    # tocl()
     # pr.disable()
     # pr.print_stats(sort='tottime')
 
