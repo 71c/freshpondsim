@@ -17,17 +17,31 @@ t_end = 20.0
 
 multiplier = 4.0
 
+# def entrance_rate(t):
+#     if t < t0:
+#         return 0
+#     return multiplier * (np.sin(t) + np.sin(3*t) + 6 - 0.3 * t)
+# def entrance_rate_integral(t):
+#     if t < t0:
+#         return 0
+#     # I want it to be fast. Found by Mathematica
+#     return multiplier * (4/3 + 6 * t - 3/20 * t**2 - np.cos(t) - 1/3 * np.cos(3*t))
+# entrance_rate_integral_inverse = None
+
+
+###### Constant Entry Rate
 def entrance_rate(t):
     if t < t0:
         return 0
-    return multiplier * (np.sin(t) + np.sin(3*t) + 6 - 0.3 * t)
-
-
+    return multiplier
 def entrance_rate_integral(t):
     if t < t0:
         return 0
-    # I want it to be fast. Found by Mathematica
-    return multiplier * (4/3 + 6 * t - 3/20 * t**2 - np.cos(t) - 1/3 * np.cos(3*t))
+    return multiplier * (t - t0)
+def entrance_rate_integral_inverse(y):
+    assert y >= 0
+    return y / multiplier + t0
+
 
 
 def integrate(func, a, b):
@@ -88,6 +102,7 @@ sim = FreshPondSim(distance=2.5,
                    rand_velocities_and_distances_func=rand_veloc_dist_func,
                    entrance_rate=entrance_rate,
                    entrance_rate_integral=entrance_rate_integral,
+                   entrance_rate_integral_inverse=entrance_rate_integral_inverse,
                    interpolate_rate=False,
                    interpolate_rate_integral=False,
                    snap_exit=False)
@@ -108,7 +123,7 @@ for i in tqdm(range(n_trials)):
         t1 = t0
         t2 = np.random.uniform(t1, t_end)
         entrance_times, exit_times = sim.get_enter_and_exit_times_in_interval(t1, t2)
-        
+
     entrance_times = np.array(entrance_times)
     exit_times = np.array(exit_times)
 
