@@ -3,6 +3,7 @@ import numpy as np
 import scipy.stats
 from function_interpolator import DynamicBoundedInterpolator
 from freshpondsim import random_times
+import bisect
 
 
 class InOutTheory:
@@ -114,9 +115,19 @@ class InOutTheory:
         return scipy.stats.poisson(self.expected_n_people(t))
 
     def duration_so_far_density(self, t):
+        assert t >= 0
         n_t = self.expected_n_people(t)
         return np.vectorize(lambda x: 0 if x < 0 else
             self.entrance_rate(t - x) * self._sf(x) / n_t)
+    
+    def duration_after_density(self, t):
+        assert t >= 0
+        n_t = self.expected_n_people(t)
+        def pdf(x):
+            y, abserr = integrate.quad(
+                lambda u: self.entrance_rate(t - u) * self._pdf(x + u), 0, t)
+            return y / n_t
+        return pdf
 
     def expected_duration_so_far(self, t):
         assert t >= 0
@@ -183,15 +194,169 @@ class InOutTheory:
             return self.cumulative_n_people(t2) - self.cumulative_n_people(t1)
         y, abserr = integrate.dblquad(lambda tau, u: self._sf(tau) * self.lamda(u - tau), t1, t2, lambda u: 0, lambda u: u)
         return y
-
-    def sample_realization(self, end_time):
+    
+    def random_entrance_times(self, end_time):
         cum_entrance_rate = self.cumulative_entrance_rate if self._closedform_cumulative_entrance_rate else None
         entrance_times = np.array(list(
             random_times(0, end_time, self.entrance_rate, cum_entrance_rate,
                          self.cumulative_entrance_rate_inverse)
         ))
+        return entrance_times
+
+    def sample_realization(self, end_time):
+        entrance_times = self.random_entrance_times(end_time)
         exit_times = entrance_times + self.T.rvs(entrance_times.shape)
         return entrance_times, exit_times
+
+
+class FastRepeatedCalls:
+    def __init__(self, func, bufsize):
+        assert bufsize >= 1
+        self._func = func
+        self._bufsize = bufsize
+        self._generate()
+    
+    def _generate(self):
+        self._buffer = self._func(self._bufsize)
+        self._index = 0
+
+    def getval(self):
+        if self._index == self._bufsize:
+            self._generate()
+        ret = self._buffer[self._index]
+        self._index += 1
+        return ret
+    
+    def getvals(self, n):
+        assert n >= 1
+        if n == 1:
+            return self.getval()
+        
+        if self._index != self._bufsize:
+            n_available = self._bufsize - self._index
+            if n <= n_available:
+                ret = self._buffer[self._index:self._index + n]
+                self._index += n
+                return ret
+            else:
+                first_vals = self._buffer[self._index:self._index + n_available]
+                self._index += n_available # i.e., self._index = self._bufsize
+                second_vals = self._func(n - n_available)
+                return np.concatenate((first_vals, second_vals))
+        else:
+            return self._func(n)
+
+
+class InOutSimulation:
+    def __init__(self, inout_theory, end_time):
+        assert isinstance(inout_theory, InOutTheory)
+        self.inout_theory = inout_theory
+        self.end_time = end_time
+        self.entrance_times = None
+        self.exit_times = None
+        self.durations = None
+        self._is_empty = True
+
+    def refresh_entrance_times(self):
+        assert not self._is_empty
+        self.entrance_times = self.inout_theory.random_entrance_times(self.end_time)
+        self.exit_times = self.entrance_times + self.durations
+
+    def refresh_durations(self):
+        assert not self._is_empty
+        self.durations = self.inout_theory.T.rvs(self.entrance_times.shape)
+        self.exit_times = self.entrance_times + self.durations
+    
+    def refresh_durations_conditional_on_inclusion(self, t0, inclusions=None):
+        if self._is_empty:
+            self.refresh()
+            return
+
+        if inclusions is None:
+            inclusions = self.get_people_inclusions(t0)
+
+        entrance_times = self.entrance_times
+
+        # for all i < gt_t0_index, entrance_times[i] <= t0, and
+        # for all i >= gt_t0_index, entrance_times[i] > t0.
+        gt_t0_index = bisect.bisect(entrance_times, t0)
+        assert np.all(entrance_times[:gt_t0_index] <= t0)
+        assert np.all(entrance_times[gt_t0_index:] > t0)
+
+        assert np.all(~inclusions[gt_t0_index:])
+
+        # T = self.inout_theory.T
+        # T_fast = FastRepeatedCalls(T.rvs, gt_t0_index)
+        # for i in range(gt_t0_index):
+        #     T_threshold = t0 - entrance_times[i]
+        #     T_i = T_fast.getval()
+        #     inclusion = inclusions[i]
+        #     while not ((T_i > T_threshold) == inclusion):
+        #         T_i = T_fast.getval()
+        #     self.durations[i] = T_i
+
+        T = self.inout_theory.T
+        T_fast = FastRepeatedCalls(T.rvs, gt_t0_index)
+        self.durations[:gt_t0_index] = T.rvs(len(self.durations[:gt_t0_index]))
+        T_thresholds = t0 - entrance_times[:gt_t0_index]
+        curr_inclusions = self.durations[:gt_t0_index] > T_thresholds
+        not_right = curr_inclusions != inclusions[:gt_t0_index]
+        n_left = len(self.durations[:gt_t0_index][not_right])
+        while n_left != 0:
+            self.durations[:gt_t0_index][not_right] = T_fast.getvals(n_left)
+            curr_inclusions = self.durations[:gt_t0_index] > T_thresholds
+            not_right = curr_inclusions != inclusions[:gt_t0_index]
+            n_left = len(self.durations[:gt_t0_index][not_right])
+
+        self.durations[gt_t0_index:] = T.rvs(len(self.durations[gt_t0_index:]))
+
+        self.exit_times = self.entrance_times + self.durations
+
+        assert np.all(self.get_people_inclusions(t0) == inclusions)
+
+    def refresh(self):
+        self.entrance_times = self.inout_theory.random_entrance_times(self.end_time)
+        self.durations = self.inout_theory.T.rvs(self.entrance_times.shape)
+        self.exit_times = self.entrance_times + self.durations
+        self._is_empty = False
+
+    def get_people_inclusions(self, t):
+        return (self.entrance_times <= t) & (t < self.exit_times)
+    
+    def n_people(self, t):
+        return sum(self.get_people_inclusions(t))
+    
+    def get_entrance_times(self, t):
+        return self.entrance_times[self.get_people_inclusions(t)]
+    
+    def get_exit_times(self, t):
+        return self.exit_times[self.get_people_inclusions(t)]
+    
+    def get_durations(self, t):
+        return self.durations[self.get_people_inclusions(t)]
+    
+    def get_residual_times_after(self, t):
+        return self.get_exit_times(t) - t
+    
+    def get_residual_times_before(self, t):
+        return t - self.get_entrance_times(t)
+    
+    def total_residual_time_after(self, t):
+        return np.sum(self.get_residual_times_after(t))
+    
+    def total_residual_time_before(self, t):
+        return np.sum(self.get_residual_times_before(t))
+    
+    def get_entrance_times_in_interval(self, t1, t2):
+        return self.entrance_times[(t1 < self.entrance_times) & (self.entrance_times <= t2)]
+    
+    def get_exit_times_in_interval(self, t1, t2):
+        return self.exit_times[(t1 < self.exit_times) & (self.exit_times <= t2)]
+
+    def get_n_integral(self, t1, t2):
+        entrances = self.get_entrance_times_in_interval(t1, t2)
+        exits = self.get_exit_times_in_interval(t1, t2)
+        return self.n_people(t1) * (t2 - t1) + np.sum(t2 - entrances) - np.sum(t2 - exits)
 
 
 if __name__ == "__main__":
