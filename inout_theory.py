@@ -15,6 +15,10 @@ class InOutTheory:
                  interpolate_duration_pdf=False,
                  interpolate_duration_sf=False,
                  time_res=None, duration_res=None):
+        '''LOL don't pay attention to all the interpolate stuff
+        since it doesn't even work anyway if you want to do the numerical
+        integration because scipy.integrate.quad gets angry and there should be
+        a way to make it work but I'm lazy so it doesn't work yet'''
 
         assert isinstance(duration_dist,
                           scipy.stats._distn_infrastructure.rv_frozen)
@@ -285,6 +289,8 @@ class InOutSimulation:
 
         assert np.all(~inclusions[gt_t0_index:])
 
+        inclusions_before = inclusions[:gt_t0_index]
+
         # T = self.inout_theory.T
         # T_fast = FastRepeatedCalls(T.rvs, gt_t0_index)
         # for i in range(gt_t0_index):
@@ -300,12 +306,12 @@ class InOutSimulation:
         self.durations[:gt_t0_index] = T.rvs(len(self.durations[:gt_t0_index]))
         T_thresholds = t0 - entrance_times[:gt_t0_index]
         curr_inclusions = self.durations[:gt_t0_index] > T_thresholds
-        not_right = curr_inclusions != inclusions[:gt_t0_index]
+        not_right = curr_inclusions != inclusions_before
         n_left = len(self.durations[:gt_t0_index][not_right])
         while n_left != 0:
             self.durations[:gt_t0_index][not_right] = T_fast.getvals(n_left)
             curr_inclusions = self.durations[:gt_t0_index] > T_thresholds
-            not_right = curr_inclusions != inclusions[:gt_t0_index]
+            not_right = curr_inclusions != inclusions_before
             n_left = len(self.durations[:gt_t0_index][not_right])
 
         self.durations[gt_t0_index:] = T.rvs(len(self.durations[gt_t0_index:]))

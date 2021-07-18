@@ -5,6 +5,9 @@ from tqdm import tqdm
 import cProfile
 from tictoc import *
 import matplotlib.pyplot as plt
+import bisect
+from generalized_binomial_generation import random_bernoulli_vectors_conditional_on_sum
+
 
 
 def total_residual_time_unconditional_test(sim, t0, n_simulations):
@@ -189,11 +192,6 @@ def explore_iverson_brackets_probabilities_conditional_on_entry_process_and_n_pe
     sim.refresh()
     nt = sim.n_people(t0)
 
-    # samples = []
-    # for i in range(100):
-    #     sim.refresh_durations()
-    #     samples.append(sim.n_people(t0))
-
     data = np.empty((n_simulations, len(sim.entrance_times)))
     for i in tqdm(range(n_simulations)):
         sim.refresh_durations()
@@ -216,6 +214,49 @@ def explore_iverson_brackets_probabilities_conditional_on_entry_process_and_n_pe
     plt.plot(x, true_probs, 'bo', ms=1, label='true probabilities')
     plt.plot(x, true_probs * nt / np.sum(true_probs), 'go', ms=1, label='true probabilities conditional approximation')
     plt.plot(x, est_probs, 'ro', ms=1, label='est. probabilities')
+    plt.legend()
+    plt.show()
+
+
+def explore_iverson_brackets_probabilities_conditional_on_entry_process_and_n_people_fast(sim, t0, n_simulations):
+    samples = np.empty(n_simulations)
+    sim.refresh()
+    nt = sim.n_people(t0)
+
+    T = sim.inout_theory.T
+
+    gt_t0_index = bisect.bisect(sim.entrance_times, t0)
+    probs_before = T.sf(t0 - sim.entrance_times[:gt_t0_index])
+
+    inclusions_arr_before = random_bernoulli_vectors_conditional_on_sum(probs_before, s=nt, n=n_simulations)
+    n_zeros_per_row = len(sim.entrance_times[gt_t0_index:])
+    zeros = np.zeros((n_simulations, n_zeros_per_row), dtype=int)
+    inclusions_arr = np.hstack((inclusions_arr_before, zeros))
+
+    data = np.empty((n_simulations, len(sim.entrance_times)))
+    for i in tqdm(range(n_simulations)):
+        sim.refresh_durations_conditional_on_inclusion(t0, inclusions=inclusions_arr[i])
+        assert sim.n_people(t0) == nt
+        data[i] = sim.get_people_inclusions(t0).astype(float)
+
+    assert np.all(data == inclusions_arr)
+
+    est_probs = data.mean(axis=0)
+
+    true_probs = np.zeros(est_probs.shape)
+    N = true_probs.shape[0]
+    true_probs = T.sf(t0 - sim.entrance_times) * (sim.entrance_times <= t0).astype(float)
+
+    # print(list(probs_before))
+    # print('Min difference:', np.min(true_probs - est_probs))
+    # print('Max difference:', np.max(true_probs - est_probs))
+
+
+
+    x = np.arange(N)
+    plt.plot(x, true_probs, 'bo', ms=1, label='unconditional probabilities')
+    # plt.plot(x, true_probs * nt / np.sum(true_probs), 'go', ms=1, label='approximate conditional probabilities')
+    plt.plot(x, est_probs, 'ro', ms=1, label='sample conditional probabilities')
     plt.legend()
     plt.show()
 
@@ -263,10 +304,11 @@ sim = InOutSimulation(iot, t_end)
 
 # explore_numerical_covariances_conditional_on_entry_process_and_jt(sim, t0, 10_000)
 
-total_residual_time_conditional_on_entry_process_test(sim, t0, 5_000)
+# total_residual_time_conditional_on_entry_process_test(sim, t0, 5_000)
 
 # explore_covariances_of_iverson_brackets_time_conditional_on_entry_process(sim, t0, 50_000)
 
-# explore_iverson_brackets_probabilities_conditional_on_entry_process(sim, t0, 1_000)
+# explore_iverson_brackets_probabilities_conditional_on_entry_process(sim, t0, 20_000)
 
 # explore_iverson_brackets_probabilities_conditional_on_entry_process_and_n_people(sim, t0, 1_000)
+explore_iverson_brackets_probabilities_conditional_on_entry_process_and_n_people_fast(sim, t0, 500)
