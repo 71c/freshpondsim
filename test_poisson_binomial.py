@@ -1,5 +1,5 @@
 from poibin import PoiBin
-from generalized_binomial_generation import random_bernoulli_vectors, random_bernoulli_vectors_conditional_on_sum
+from generalized_binomial_utils import random_bernoulli_vectors, random_bernoulli_vectors_conditional_on_sum
 import numpy as np
 from tictoc import *
 import matplotlib.pyplot as plt

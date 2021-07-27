@@ -4,46 +4,89 @@ from freshpondsim import random_times
 from tqdm import tqdm
 from inout_theory import InOutTheory
 import matplotlib.pyplot as plt
+from scipy.special import gamma as Gamma
+from scipy import integrate
 
 
-VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6']
+VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']
 VERSIONS = VERSIONS_UNINFORMED + ['informed']
 
 
-def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, t1, t2):
-    n_integral = start_n_people * (t2 - t1) + np.sum(t2 - entrance_times) - np.sum(t2 - exit_times)
-    estimated_mean_time_v1 = n_integral / ((len(entrance_times) + len(exit_times))/2)
-    estimated_mean_time_v2 = 0.5 * (n_integral / len(entrance_times) + n_integral / len(exit_times))
-    estimated_mean_time_v3 = n_integral / len(exit_times)
-    estimated_mean_time_v4 = n_integral / len(entrance_times)
+def get_mean_duration_estimation_constants_weibull(est_mu, dt, k=1.5):
+    G1 = Gamma(1 + 1/k)
+    G2 = Gamma(1 + 2/k)
+    G3 = Gamma(1 + 3/k)
+    s = est_mu / G1
+    gamma = G2 / (2 * G1)
+    VA = s**2 * (G3 / (3 * G1) - gamma**2)
 
-    estimated_mean_time_v5 = n_integral / (0.7 * len(exit_times) + 0.3 * len(entrance_times))
+    def pdf_A(x):
+        return np.exp(-(x/s)**k) / est_mu
+    prob_exceed, abserr = integrate.quad(pdf_A, dt, np.inf)
+
+    VT = s**2 * (G2 - G1**2)
+
+    return {'gamma': gamma, 'VA': VA, 'prob_exceed': prob_exceed, 'VT': VT}
+
+
+def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, t1, t2):
+    E = len(exit_times)
+    Lambda = len(entrance_times)
+
+    n_integral = start_n_people * (t2 - t1) + np.sum(t2 - entrance_times) - np.sum(t2 - exit_times)
+    estimated_mean_time_v1 = n_integral / ((Lambda + E)/2)
+    estimated_mean_time_v2 = 0.5 * (n_integral / Lambda + n_integral / E)
+    estimated_mean_time_v3 = n_integral / E
+    estimated_mean_time_v4 = n_integral / Lambda
+
+    # estimated_mean_time_v5 = n_integral / (0.7 * E + 0.3 * Lambda)
+    estimated_mean_time_v5 = ((n_integral / (0.7 * E + 0.3 * Lambda)) + (n_integral / (0.3 * E + 0.7 * Lambda))) / 2
+
+    tmp = E/Lambda - 1
 
     # http://www.columbia.edu/~ww2040/LL_OR.pdf
-    tmp = (len(exit_times)/len(entrance_times) - 1)
     K = 1.0
     estimated_mean_time_v6 = estimated_mean_time_v4 * (1 - tmp * K)
 
-    # v5 and v6 are only appropriate when start time is 0
+    # Wrong calculation - forgot covariance
+    # n2 = start_n_people + Lambda - E
+    # d = get_mean_duration_estimation_constants_weibull(estimated_mean_time_v4, k=1.5)
+    # gamma = d['gamma']
+    # VA = d['VA']
+    # tmp2 = (start_n_people + n2) * VA / Lambda
+    # tmp3 = n_integral / (n_integral + tmp2)
+    # tmp4 = tmp3 * tmp * gamma
+    # estimated_mean_time_v7 = (1 - tmp4) * estimated_mean_time_v4
 
-    # min_exit_time, max_exit_time = min(exit_times), max(exit_times)
-    # min_entrance_time, max_entrance_time = min(entrance_times), max(entrance_times)
+    # Correct calculation
+    mu0 = estimated_mean_time_v4
+    if tmp == 0:
+        estimated_mean_time_v7 = mu0
+    else:
+        n1 = start_n_people
+        n2 = n1 + Lambda - E
+        d = get_mean_duration_estimation_constants_weibull(mu0, dt=t2-t1, k=1.5)
+        gamma = d['gamma']
+        VA = d['VA']
+        prob_exceed = d['prob_exceed']
+        VT = d['VT']
+        C1 = tmp * gamma
+        # print(2 * n1 * VT * prob_exceed, 2 * n1 * VT * prob_exceed / ((n1 + n2) * VA - 2 * n1 * VT * prob_exceed))
+        # C2 = (n1 + n2) * VA / Lambda**2
+        C2 = ((n1 + n2) * VA - 2 * n1 * VT * prob_exceed) / Lambda**2
+        cov_hat = C1 * C2
+        var_hat = C1**2 * C2
+        bias_hat = C1 * mu0
+        
+        alpha_hat = (bias_hat**2 + cov_hat) / (bias_hat**2 + var_hat)
+        # print(alpha_hat)
+        # print(tmp, gamma, bias_hat, cov_hat, var_hat, alpha_hat)
+        # if alpha_hat < 0.0:
+        #     alpha_hat = 0
+        # if alpha_hat > 1.0:
+        #     alpha_hat = 1.0
 
-    # if max_entrance_time > max_exit_time:
-    #     # t2 = max_exit_time
-    #     t2 = min(entrance_times[entrance_times > max_exit_time])
-    #     entrance_times = entrance_times[entrance_times < max_exit_time]
-
-    # if min_exit_time < min_entrance_time:
-    #     exit_times_before = exit_times[exit_times < min_entrance_time]
-    #     # t1 = min_entrance_time
-    #     t1 = max(exit_times_before)
-    #     start_n_people = start_n_people - len(exit_times_before)
-    #     exit_times = exit_times[exit_times > min_entrance_time]
-    
-    # n_integral = start_n_people * (t2 - t1) + np.sum(t2 - entrance_times) - np.sum(t2 - exit_times)
-    # estimated_mean_time_v5 = 0.5 * (n_integral / len(entrance_times) + n_integral / len(exit_times))
-    # estimated_mean_time_v6 = n_integral / ((len(entrance_times) + len(exit_times))/2)
+        estimated_mean_time_v7 = mu0 - alpha_hat * bias_hat
 
     return {
         'v1': estimated_mean_time_v1,
@@ -52,7 +95,8 @@ def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, 
         'v4': estimated_mean_time_v4,
 
         'v5': estimated_mean_time_v5,
-        'v6': estimated_mean_time_v6
+        'v6': estimated_mean_time_v6,
+        'v7': estimated_mean_time_v7
     }
 
 
@@ -90,7 +134,7 @@ def get_mean_duration_estimations(iot, t_sample_start, t_sample_end, n_simulatio
 #     expected_estimated_mean_duration_v2 = 0.5 * (n_integral / n_entrance + n_integral / n_exit)
 #     expected_estimated_mean_duration_v3 = n_integral / n_exit
 #     expected_estimated_mean_duration_v4 = n_integral / n_entrance
-    
+
 
 
 
@@ -158,8 +202,8 @@ iot = InOutTheory(duration_dist, rate, cum_rate, cum_rate_inverse)
 
 
 
-t_sample_start = 30.0
-t_sample_ends = np.linspace(35.0, 70.0, num=10)
+t_sample_start = 100.0
+t_sample_ends = np.linspace(105.0, 115.0, num=10)
 n_simulations = 1000
 
 biases = {v: [] for v in VERSIONS}
@@ -172,6 +216,7 @@ for t_sample_end in tqdm(t_sample_ends):
         avg = np.mean(samples)
         bias = avg - iot._mean_duration
         rmse = np.sqrt(np.mean((samples - iot._mean_duration)**2))
+        # rmse = np.sqrt(np.mean((samples - est_means['informed'])**2))
         biases[name].append(bias)
         rmses[name].append(rmse)
 

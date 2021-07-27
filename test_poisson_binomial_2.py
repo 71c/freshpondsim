@@ -1,5 +1,5 @@
 from poibin import PoiBin
-from generalized_binomial_generation import random_bernoulli_vectors, random_bernoulli_vectors_conditional_on_sum
+from generalized_binomial_utils import random_bernoulli_vectors, random_bernoulli_vectors_conditional_on_sum
 import numpy as np
 from tictoc import *
 import matplotlib.pyplot as plt
@@ -77,6 +77,7 @@ def get_bernoulli_probs_conditional_on_sum(probs, use_fft=True):
         new_probs = np.concatenate((probs[:i], probs[i+1:]))
         probs_of_sum_given_Xi[:, i] = get_poibin_pmf(new_probs, use_fft=use_fft)
 
+    print(pmf[1:, None])
     # return probs_of_sum_given_Xi
     return probs_of_sum_given_Xi * probs / pmf[1:, None]
 
@@ -132,8 +133,8 @@ X_approx = np.arange(1, N+1)[:, None] * p / np.sum(p)
 # print(X_RF1)
 # print(X_fft)
 
-print('Max val FFT:', np.amax(X_RF1))
-print('Max val RF1:', np.amax(X_fft))
+print('Max val FFT:', np.amax(X_fft))
+print('Max val RF1:', np.amax(X_RF1))
 
 
 plt.matshow(X_RF1)
@@ -145,6 +146,11 @@ plt.matshow(X_fft)
 plt.xlabel('the value of i')
 plt.ylabel('the value of s')
 plt.title('P(X_i=1 | S=s), FFT')
+
+plt.matshow(X_fft - X_RF1)
+plt.xlabel('the value of i')
+plt.ylabel('the value of s')
+plt.title('difference')
 
 # plt.matshow(X_approx)
 # plt.xlabel('the value of i')
