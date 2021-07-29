@@ -10,6 +10,7 @@ from inout_theory import InOutTheory
 import matplotlib.pyplot as plt
 from scipy.special import gamma as Gamma
 from scipy import integrate
+from tictoc import *
 
 
 VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']
@@ -115,8 +116,8 @@ def get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, 
         # time t_sample_end
         entrance_times, exit_times = iot.sample_realization(t_sample_end)
 
-        n_entrances_before = len(entrance_times[entrance_times <= t_sample_start])
-        n_exits_before = len(exit_times[exit_times <= t_sample_start])
+        n_entrances_before = len(entrance_times[entrance_times < t_sample_start])
+        n_exits_before = len(exit_times[exit_times < t_sample_start])
         n_people_at_start = n_entrances_before - n_exits_before
         sample_entrance_times = entrance_times[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)]
         sample_exit_times = exit_times[(t_sample_start < exit_times) & (exit_times <= t_sample_end)]
@@ -124,7 +125,7 @@ def get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, 
         versions = estimate_mean_duration_versions(n_people_at_start, sample_entrance_times, sample_exit_times, t_sample_start, t_sample_end)
         for v in VERSIONS_UNINFORMED:
             est_means[v][i] = versions[v]
-        
+
         version_informed = np.mean((exit_times - entrance_times)[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)])
         est_means['informed'][i] = version_informed
 
@@ -173,8 +174,10 @@ iot = InOutTheory(duration_dist, rate, cum_rate, cum_rate_inverse)
 
 
 t_sample_start = 100.0
-t_sample_ends = np.linspace(105.0, 115.0, num=4)
-n_simulations = 100
+n_sample_ends = 4
+max_sample_end = 115.0
+t_sample_ends = np.linspace(105.0, max_sample_end, num=n_sample_ends)
+n_simulations = 900
 
 biases_wrt_mu = {v: [] for v in VERSIONS}
 rmses_wrt_mu = {v: [] for v in VERSIONS}
@@ -182,8 +185,35 @@ rmses_wrt_mulambda = {v: [] for v in VERSIONS}
 
 # Naive method time complexity: n_ends * n_simulations * O(t_end)
 # Smart method time complexity: n_simulations * O(t_end)
-for t_sample_end in tqdm(t_sample_ends):
-    est_means = get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, n_simulations, do_tqdm=False)
+
+# New version
+tic()
+
+# The i'th element of `estimations` corresponds to estimations
+# for t_sample_end being t_sample_ends[i].
+estimations = [
+    {v: np.empty(n_simulations) for v in VERSIONS}
+    for _ in range(n_sample_ends)]
+
+for simulation_num in range(n_simulations):
+    entrance_times, exit_times = iot.sample_realization(max_sample_end)
+
+    n_entrances_before = len(entrance_times[entrance_times <= t_sample_start])
+    n_exits_before = len(exit_times[exit_times <= t_sample_start])
+    n_people_at_start = n_entrances_before - n_exits_before
+    
+    for i, t_sample_end in enumerate(t_sample_ends):
+        sample_entrance_times = entrance_times[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)]
+        sample_exit_times = exit_times[(t_sample_start < exit_times) & (exit_times <= t_sample_end)]
+
+        versions = estimate_mean_duration_versions(n_people_at_start, sample_entrance_times, sample_exit_times, t_sample_start, t_sample_end)
+        for v in VERSIONS_UNINFORMED:
+            estimations[i][v][simulation_num] = versions[v]
+        version_informed = np.mean((exit_times - entrance_times)[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)])
+        estimations[i]['informed'][simulation_num] = version_informed
+
+for i, t_sample_end in enumerate(t_sample_ends):
+    est_means = estimations[i]
     for name in VERSIONS:
         samples = est_means[name]
         avg = np.mean(samples)
@@ -193,6 +223,23 @@ for t_sample_end in tqdm(t_sample_ends):
         biases_wrt_mu[name].append(bias_wrt_mu)
         rmses_wrt_mu[name].append(rmse_wrt_mu)
         rmses_wrt_mulambda[name].append(rmse_wrt_mulambda)
+
+toc()
+
+# Old, inefficient version
+# tic()
+# for t_sample_end in tqdm(t_sample_ends):
+#     est_means = get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, n_simulations, do_tqdm=False)
+#     for name in VERSIONS:
+#         samples = est_means[name]
+#         avg = np.mean(samples)
+#         bias_wrt_mu = avg - iot._mean_duration
+#         rmse_wrt_mu = np.sqrt(np.mean((samples - iot._mean_duration)**2))
+#         rmse_wrt_mulambda = np.sqrt(np.mean((samples - est_means['informed'])**2))
+#         biases_wrt_mu[name].append(bias_wrt_mu)
+#         rmses_wrt_mu[name].append(rmse_wrt_mu)
+#         rmses_wrt_mulambda[name].append(rmse_wrt_mulambda)
+# toc()
 
 for v in VERSIONS:
     plt.plot(t_sample_ends, rmses_wrt_mulambda[v], label=v)
