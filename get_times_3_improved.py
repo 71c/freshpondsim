@@ -5,7 +5,7 @@ correspondence between entrances and exits is not known
 import numpy as np
 import scipy.stats
 from freshpondsim import random_times
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from inout_theory import InOutTheory
 import matplotlib.pyplot as plt
 from scipy.special import gamma as Gamma
@@ -14,7 +14,8 @@ from tictoc import *
 
 
 VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7']
-VERSIONS = VERSIONS_UNINFORMED + ['informed']
+VERSIONS_INFORMED = ['entrances', 'exits', 'entrances and exits weighted average', 'entrances and exits unweighted average', 'union']
+VERSIONS = VERSIONS_UNINFORMED + VERSIONS_INFORMED
 
 
 def get_mean_duration_estimation_constants_weibull(est_mu, dt, k=1.5):
@@ -34,7 +35,10 @@ def get_mean_duration_estimation_constants_weibull(est_mu, dt, k=1.5):
     return {'gamma': gamma, 'VA': VA, 'prob_exceed': prob_exceed, 'VT': VT}
 
 
-def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, t1, t2):
+def estimate_mean_duration_versions_uninformed(start_n_people, entrance_times, exit_times, t1, t2):
+    assert np.all((t1 < entrance_times) & (entrance_times <= t2))
+    assert np.all((t1 < exit_times) & (exit_times <= t2))
+
     E = len(exit_times)
     Lambda = len(entrance_times)
 
@@ -52,16 +56,6 @@ def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, 
     # http://www.columbia.edu/~ww2040/LL_OR.pdf
     K = 1.0
     estimated_mean_time_v6 = estimated_mean_time_v4 * (1 - tmp * K)
-
-    # Wrong calculation - forgot covariance
-    # n2 = start_n_people + Lambda - E
-    # d = get_mean_duration_estimation_constants_weibull(estimated_mean_time_v4, k=1.5)
-    # gamma = d['gamma']
-    # VA = d['VA']
-    # tmp2 = (start_n_people + n2) * VA / Lambda
-    # tmp3 = n_integral / (n_integral + tmp2)
-    # tmp4 = tmp3 * tmp * gamma
-    # estimated_mean_time_v7 = (1 - tmp4) * estimated_mean_time_v4
 
     # Correct calculation
     mu0 = estimated_mean_time_v4
@@ -105,64 +99,87 @@ def estimate_mean_duration_versions(start_n_people, entrance_times, exit_times, 
     }
 
 
-def get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, n_simulations, do_tqdm=True):
-    est_means = {v: np.empty(n_simulations) for v in VERSIONS}
+# VERSIONS_INFORMED = ['entrances', 'exits', 'entrances and exits weighted average', 'entrances and exits unweighted average', 'union']
+def estimate_mean_duration_versions_informed(entrance_times, exit_times, t1, t2):
+    assert len(entrance_times) == len(exit_times)
 
-    it = range(n_simulations)
-    if do_tqdm:
-        it = tqdm(it)
-    for i in it:
-        # it's ok to do this because all that matters is what happens before
-        # time t_sample_end
-        entrance_times, exit_times = iot.sample_realization(t_sample_end)
+    durations = exit_times - entrance_times
+    entrance_inclusions = (t1 < entrance_times) & (entrance_times <= t2)
+    exit_inclusions = (t1 < exit_times) & (exit_times <= t2)
+    
+    durations_entrances = durations[entrance_inclusions]
+    durations_exits = durations[exit_inclusions]
+    durations_union = durations[entrance_inclusions | exit_inclusions]
+    durations_intersection = durations[entrance_inclusions & exit_inclusions]
+    n_entrances = len(durations_entrances)
+    n_exits = len(durations_exits)
+    # print(len(durations_entrances), len(durations_exits), len(durations_union))
 
-        n_entrances_before = len(entrance_times[entrance_times < t_sample_start])
-        n_exits_before = len(exit_times[exit_times < t_sample_start])
-        n_people_at_start = n_entrances_before - n_exits_before
-        sample_entrance_times = entrance_times[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)]
-        sample_exit_times = exit_times[(t_sample_start < exit_times) & (exit_times <= t_sample_end)]
+    # M = np.vstack((entrance_inclusions, exit_inclusions, entrance_inclusions | exit_inclusions))
+    # plt.matshow(M, aspect='auto')
+    # plt.show()
+    # exit()
 
-        versions = estimate_mean_duration_versions(n_people_at_start, sample_entrance_times, sample_exit_times, t_sample_start, t_sample_end)
-        for v in VERSIONS_UNINFORMED:
-            est_means[v][i] = versions[v]
+    # plt.hist(durations_entrances, bins='auto', label='durations_entrances')
+    # plt.legend()
+    # plt.figure()
+    # plt.hist(durations_union, bins='auto', label='durations_union')
+    # plt.show()
+    # exit()
+    
+    v_entrances = np.mean(durations_entrances)
+    v_exits = np.mean(durations_exits)
+    v_union = np.mean(durations_union)
 
-        version_informed = np.mean((exit_times - entrance_times)[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)])
-        est_means['informed'][i] = version_informed
+    v_union_2 = (np.sum(durations_entrances) + np.sum(durations_exits) - np.sum(durations_intersection)) / (n_entrances + n_exits - len(durations_intersection))
+    assert np.isclose(v_union_2, v_union)
 
-    return est_means
+    v_weighted_avg = (np.sum(durations_entrances) + np.sum(durations_exits)) / (n_entrances + n_exits)
+    # alpha = n_entrances / (n_entrances + n_exits)
+    # v_weighted_avg_2 = alpha * v_entrances + (1-alpha) * v_exits
+    # assert np.isclose(v_weighted_avg, v_weighted_avg_2)
+    v_unweighted_avg = (v_entrances + v_exits) / 2
+
+    return {
+        'entrances': v_entrances,
+        'exits': v_exits,
+        'entrances and exits weighted average': v_weighted_avg,
+        'entrances and exits unweighted average': v_unweighted_avg,
+        'union': v_union
+    }
 
 
 entrance_rate_constant = 15.0
 
 # Set up entrance rate
-# Sinusoidal entrance rate
-# a = 0.95 * entrance_rate_constant
-# period = 20
-# freq = 1/period
-# omega = 2*np.pi * freq
-# def rate(t):
-#     if t < 0:
-#         return 0.0
-#     return entrance_rate_constant + a * np.cos(omega * t)
-# def cum_rate(t):
-#     if t < 0:
-#         return 0.0
-#     return entrance_rate_constant * t + a / omega * np.sin(omega * t)
-# cum_rate_inverse = None
+###### Sinusoidal entrance rate
+a = 0.7 * entrance_rate_constant
+period = 20
+freq = 1/period
+omega = 2*np.pi * freq
+def rate(t):
+    if t < 0:
+        return 0.0
+    return entrance_rate_constant + a * np.cos(omega * t)
+def cum_rate(t):
+    if t < 0:
+        return 0.0
+    return entrance_rate_constant * t + a / omega * np.sin(omega * t)
+cum_rate_inverse = None
 
 
 ###### Constant Entry Rate
-def rate(t):
-    if t < 0:
-        return 0
-    return entrance_rate_constant
-def cum_rate(t):
-    if t < 0:
-        return 0
-    return entrance_rate_constant * t
-def cum_rate_inverse(y):
-    assert y >= 0
-    return y / entrance_rate_constant
+# def rate(t):
+#     if t < 0:
+#         return 0
+#     return entrance_rate_constant
+# def cum_rate(t):
+#     if t < 0:
+#         return 0
+#     return entrance_rate_constant * t
+# def cum_rate_inverse(y):
+#     assert y >= 0
+#     return y / entrance_rate_constant
 
 
 # Set up duration distribution
@@ -174,20 +191,15 @@ iot = InOutTheory(duration_dist, rate, cum_rate, cum_rate_inverse)
 
 
 t_sample_start = 100.0
-n_sample_ends = 4
-max_sample_end = 115.0
+n_sample_ends = 100
+max_sample_end = 150.0
 t_sample_ends = np.linspace(105.0, max_sample_end, num=n_sample_ends)
-n_simulations = 900
+n_simulations = 5_000
 
-biases_wrt_mu = {v: [] for v in VERSIONS}
-rmses_wrt_mu = {v: [] for v in VERSIONS}
-rmses_wrt_mulambda = {v: [] for v in VERSIONS}
+biases_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
+rmses_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
+rmses_wrt_mulambda = {v: np.empty(n_sample_ends) for v in VERSIONS}
 
-# Naive method time complexity: n_ends * n_simulations * O(t_end)
-# Smart method time complexity: n_simulations * O(t_end)
-
-# New version
-tic()
 
 # The i'th element of `estimations` corresponds to estimations
 # for t_sample_end being t_sample_ends[i].
@@ -195,22 +207,24 @@ estimations = [
     {v: np.empty(n_simulations) for v in VERSIONS}
     for _ in range(n_sample_ends)]
 
-for simulation_num in range(n_simulations):
+for simulation_num in trange(n_simulations):
     entrance_times, exit_times = iot.sample_realization(max_sample_end)
 
     n_entrances_before = len(entrance_times[entrance_times <= t_sample_start])
     n_exits_before = len(exit_times[exit_times <= t_sample_start])
     n_people_at_start = n_entrances_before - n_exits_before
-    
+
     for i, t_sample_end in enumerate(t_sample_ends):
         sample_entrance_times = entrance_times[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)]
         sample_exit_times = exit_times[(t_sample_start < exit_times) & (exit_times <= t_sample_end)]
 
-        versions = estimate_mean_duration_versions(n_people_at_start, sample_entrance_times, sample_exit_times, t_sample_start, t_sample_end)
+        versions_uninformed = estimate_mean_duration_versions_uninformed(n_people_at_start, sample_entrance_times, sample_exit_times, t_sample_start, t_sample_end)
         for v in VERSIONS_UNINFORMED:
-            estimations[i][v][simulation_num] = versions[v]
-        version_informed = np.mean((exit_times - entrance_times)[(t_sample_start < entrance_times) & (entrance_times <= t_sample_end)])
-        estimations[i]['informed'][simulation_num] = version_informed
+            estimations[i][v][simulation_num] = versions_uninformed[v]
+        
+        versions_informed = estimate_mean_duration_versions_informed(entrance_times, exit_times, t_sample_start, t_sample_end)
+        for v in VERSIONS_INFORMED:
+            estimations[i][v][simulation_num] = versions_informed[v]
 
 for i, t_sample_end in enumerate(t_sample_ends):
     est_means = estimations[i]
@@ -219,46 +233,65 @@ for i, t_sample_end in enumerate(t_sample_ends):
         avg = np.mean(samples)
         bias_wrt_mu = avg - iot._mean_duration
         rmse_wrt_mu = np.sqrt(np.mean((samples - iot._mean_duration)**2))
-        rmse_wrt_mulambda = np.sqrt(np.mean((samples - est_means['informed'])**2))
-        biases_wrt_mu[name].append(bias_wrt_mu)
-        rmses_wrt_mu[name].append(rmse_wrt_mu)
-        rmses_wrt_mulambda[name].append(rmse_wrt_mulambda)
+        rmse_wrt_mulambda = np.sqrt(np.mean((samples - est_means['entrances'])**2))
+        biases_wrt_mu[name][i] = (bias_wrt_mu)
+        rmses_wrt_mu[name][i] = (rmse_wrt_mu)
+        rmses_wrt_mulambda[name][i] = (rmse_wrt_mulambda)
 
-toc()
 
-# Old, inefficient version
-# tic()
-# for t_sample_end in tqdm(t_sample_ends):
-#     est_means = get_mean_duration_estimations_uninformed(iot, t_sample_start, t_sample_end, n_simulations, do_tqdm=False)
-#     for name in VERSIONS:
-#         samples = est_means[name]
-#         avg = np.mean(samples)
-#         bias_wrt_mu = avg - iot._mean_duration
-#         rmse_wrt_mu = np.sqrt(np.mean((samples - iot._mean_duration)**2))
-#         rmse_wrt_mulambda = np.sqrt(np.mean((samples - est_means['informed'])**2))
-#         biases_wrt_mu[name].append(bias_wrt_mu)
-#         rmses_wrt_mu[name].append(rmse_wrt_mu)
-#         rmses_wrt_mulambda[name].append(rmse_wrt_mulambda)
-# toc()
-
-for v in VERSIONS:
+# Compare uninformed estimators
+plt.figure()
+for v in VERSIONS_UNINFORMED + ['entrances']:
     plt.plot(t_sample_ends, rmses_wrt_mulambda[v], label=v)
 plt.xlabel('sample end time')
 plt.ylabel('RMSE w.r.t. $\mu^\lambda$')
+plt.title('RMSE of uninformed estimators w.r.t. $\mu^\lambda$')
 plt.legend()
 
 plt.figure()
-for v in VERSIONS:
+for v in VERSIONS_UNINFORMED + ['entrances']:
     plt.plot(t_sample_ends, rmses_wrt_mu[v], label=v)
 plt.xlabel('sample end time')
 plt.ylabel('RMSE w.r.t. $\mu$')
+plt.title('RMSE of uninformed estimators w.r.t. $\mu$')
 plt.legend()
 
 plt.figure()
-for v in VERSIONS:
+for v in VERSIONS_UNINFORMED + ['entrances']:
     plt.plot(t_sample_ends, biases_wrt_mu[v], label=v)
 plt.xlabel('sample end time')
 plt.ylabel('bias w.r.t. $\mu$')
+plt.title('bias of uninformed estimators w.r.t. $\mu$')
 plt.legend()
+
+# Compare informed estimators
+plt.figure()
+for v in VERSIONS_INFORMED:
+    plt.plot(t_sample_ends, rmses_wrt_mu[v], label=v)
+plt.xlabel('sample end time')
+plt.ylabel('RMSE w.r.t. $\mu$')
+plt.title('RMSE of informed estimators w.r.t. $\mu$')
+plt.legend()
+
+plt.figure()
+for v in VERSIONS_INFORMED:
+    plt.plot(t_sample_ends, biases_wrt_mu[v], label=v)
+plt.xlabel('sample end time')
+plt.ylabel('bias w.r.t. $\mu$')
+plt.title('bias of informed estimators w.r.t. $\mu$')
+plt.legend()
+
+plt.figure()
+for v in VERSIONS_INFORMED:
+    mse = rmses_wrt_mu[v]**2
+    bias = biases_wrt_mu[v]
+    variance = mse - bias**2
+    standard_error = np.sqrt(variance)
+    plt.plot(t_sample_ends, standard_error, label=v)
+plt.xlabel('sample end time')
+plt.ylabel('standard error')
+plt.title('standard error of informed estimators')
+plt.legend()
+
 
 plt.show()
