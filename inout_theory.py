@@ -349,13 +349,13 @@ class InOutSimulation:
     
     def total_residual_time_after(self, t):
         return np.sum(self.get_residual_times_after(t))
-    
+
     def total_residual_time_before(self, t):
         return np.sum(self.get_residual_times_before(t))
-    
+
     def get_entrance_times_in_interval(self, t1, t2):
         return self.entrance_times[(t1 < self.entrance_times) & (self.entrance_times <= t2)]
-    
+
     def get_exit_times_in_interval(self, t1, t2):
         return self.exit_times[(t1 < self.exit_times) & (self.exit_times <= t2)]
 

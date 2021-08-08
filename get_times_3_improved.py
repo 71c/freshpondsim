@@ -9,12 +9,15 @@ from tqdm import tqdm, trange
 from inout_theory import InOutTheory
 import matplotlib.pyplot as plt
 from scipy.special import gamma as Gamma
+from scipy.special import gammaincc
 from scipy import integrate
 from tictoc import *
+from cycler import cycler
 
 
 # VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'bias corrected Lambda', 'bias corrected Lambda minimum MSE', 'bias corrected E', 'avg bias corrected E, Lambda', 'bias corrected Lambda 2', 'bias corrected Lambda minimum MSE 2']
-VERSIONS_UNINFORMED = ['v4', 'bias corrected Lambda', 'bias corrected Lambda minimum MSE', 'bias corrected E', 'avg bias corrected E, Lambda', 'bias corrected Lambda 2', 'bias corrected Lambda minimum MSE 2 a', 'bias corrected Lambda minimum MSE 2 a no cov', 'E minimum MSE', 'avg Lambda, E minimum MSE'] # , 'bias corrected Lambda minimum MSE 2 b', 'bias corrected Lambda minimum MSE 2 c'
+# VERSIONS_UNINFORMED = ['v4', 'bias corrected Lambda', 'bias corrected Lambda minimum MSE', 'bias corrected E', 'avg bias corrected E, Lambda', 'bias corrected Lambda 2', 'bias corrected Lambda minimum MSE 2 a', 'bias corrected Lambda minimum MSE 2 a no cov', 'E minimum MSE', 'avg Lambda, E minimum MSE', 'minimum MSE direct'] # , 'bias corrected Lambda minimum MSE 2 b', 'bias corrected Lambda minimum MSE 2 c'
+VERSIONS_UNINFORMED = ['v1', 'v2', 'v3', 'v4', 'v5', 'bias corrected Lambda',  'bias corrected E', 'bias corrected Lambda 2', 'bias corrected Lambda minimum MSE 2 a no cov', 'E minimum MSE', 'avg Lambda, E minimum MSE', 'MLE']
 VERSIONS_INFORMED = ['entrances', 'exits', 'entrances and exits weighted average', 'entrances and exits unweighted average']#, 'union'
 VERSIONS = VERSIONS_UNINFORMED + VERSIONS_INFORMED
 
@@ -31,10 +34,9 @@ def get_mean_duration_estimation_constants_weibull(est_mu, dt, k=1.5):
     #     return np.exp(-(x/s)**k) / est_mu
     # prob_exceed, abserr = integrate.quad(pdf_A, dt, np.inf)
 
-    def pdf_A(x):
-        return np.exp(-(x/s)**k)
-    prob_exceed, abserr = integrate.quad(pdf_A, dt, np.inf)
-    prob_exceed /= est_mu
+    a = 1/k
+    z = (dt/s)**k
+    prob_exceed = s/k * Gamma(a) * gammaincc(a, z) / est_mu
 
     VT = s**2 * (G2 - G1**2)
 
@@ -201,7 +203,7 @@ def estimate_mean_duration_versions_uninformed(start_n_people, entrance_times, e
 
     # estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_c = estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_b
     # # estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_c = mu0
-    
+
     # for _ in range(5):
     #     dic = get_mean_duration_estimation_constants_weibull(estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_c, dt=t2-t1, k=k_hat)
     #     gamma = dic['gamma']
@@ -240,6 +242,62 @@ def estimate_mean_duration_versions_uninformed(start_n_people, entrance_times, e
     avg_Lambda_E_minimum_MSE = (estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_a_no_cov + estimated_mean_time_E_minimum_MSE) / 2
 
 
+    # ##### Direct MSE
+    # C1 = 0.5 # lambda    mu0
+    # C2 = 0.5 # e         mu1
+
+    # mu_init = C1 * mu0 + C2 * mu1
+
+    # base_mu = mu_init
+    # # base_mu = avg_Lambda_E_minimum_MSE
+    # d = get_mean_duration_estimation_constants_weibull(base_mu, dt=t2-t1, k=k_hat)
+    # gamma = d['gamma']
+    # VA = d['VA']
+
+    # var_mu0 = (n1 + n2) * VA / Lambda**2
+    # K_lambda = tmp * gamma
+
+    # var_mu1 = (n1 + n2) * VA / E**2
+    # K_e = tmp2 * gamma
+
+    # var_mu_init = C1**2 * var_mu0 + C2**2 * var_mu1
+    # # K = C1 * K_lambda + C2 * K_e
+    # # K = (C1 * K_lambda * mu0 + C2 * K_e * mu1) / mu_init
+    # # K = (C1 * K_lambda * estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_a_no_cov + C2 * K_e * estimated_mean_time_E_minimum_MSE) / mu_init
+    # K = (C1 * K_lambda * estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_a_no_cov + C2 * K_e * estimated_mean_time_E_minimum_MSE) / avg_Lambda_E_minimum_MSE
+
+    # estimated_mean_time_minimum_MSE_direct = mu_init / (1 + K + var_mu_init / (mu_init**2 * (1 + K)))
+    # # estimated_mean_time_minimum_MSE_direct = mu_init / (1 + K + var_mu_init / (avg_Lambda_E_minimum_MSE**2 * (1 + K)))
+
+
+    ##### Direct MSE
+    C1 = 0.5 # lambda    mu0
+    C2 = 0.5 # e         mu1
+
+    mu_init = C1 * mu0 + C2 * mu1
+    
+    d = get_mean_duration_estimation_constants_weibull(mu0, dt=t2-t1, k=k_hat)
+    gamma = d['gamma']
+    VA = d['VA']
+    var_mu0 = (n1 + n2) * VA / Lambda**2
+    K_lambda = tmp * gamma
+
+    d = get_mean_duration_estimation_constants_weibull(mu1, dt=t2-t1, k=k_hat)
+    gamma = d['gamma']
+    VA = d['VA']
+    var_mu1 = (n1 + n2) * VA / E**2
+    K_e = tmp2 * gamma
+
+    var_mu_init = C1**2 * var_mu0 + C2**2 * var_mu1
+    # K = C1 * K_lambda + C2 * K_e
+    K = (C1 * K_lambda * mu0 + C2 * K_e * mu1) / mu_init
+
+    estimated_mean_time_minimum_MSE_direct = mu_init / (1 + K + var_mu_init / (mu_init**2 * (1 + K)))
+
+
+    # estimated_mean_time_MLE = mu_init / (1 + C1 * K_lambda + C2 * K_e)
+    estimated_mean_time_MLE = mu_init / (1 + K)
+
 
     return {
         'v1': estimated_mean_time_v1,
@@ -261,7 +319,11 @@ def estimate_mean_duration_versions_uninformed(start_n_people, entrance_times, e
         # 'bias corrected Lambda minimum MSE 2 c': estimated_mean_time_bias_corrected_Lambda_minimum_MSE_2_c
 
         'E minimum MSE': estimated_mean_time_E_minimum_MSE,
-        'avg Lambda, E minimum MSE': avg_Lambda_E_minimum_MSE
+        'avg Lambda, E minimum MSE': avg_Lambda_E_minimum_MSE,
+
+        'minimum MSE direct': estimated_mean_time_minimum_MSE_direct,
+
+        'MLE': estimated_mean_time_MLE
     }
 
 
@@ -319,33 +381,33 @@ entrance_rate_constant = 15.0
 
 # Set up entrance rate
 ###### Sinusoidal entrance rate
-# a = 0.7 * entrance_rate_constant
-# period = 20
-# freq = 1/period
-# omega = 2*np.pi * freq
-# def rate(t):
-#     if t < 0:
-#         return 0.0
-#     return entrance_rate_constant + a * np.cos(omega * t)
-# def cum_rate(t):
-#     if t < 0:
-#         return 0.0
-#     return entrance_rate_constant * t + a / omega * np.sin(omega * t)
-# cum_rate_inverse = None
+a = 0.7 * entrance_rate_constant
+period = 20.0
+freq = 1/period
+omega = 2*np.pi * freq
+def rate(t):
+    if t < 0:
+        return 0.0
+    return entrance_rate_constant + a * np.cos(omega * t)
+def cum_rate(t):
+    if t < 0:
+        return 0.0
+    return entrance_rate_constant * t + a / omega * np.sin(omega * t)
+cum_rate_inverse = None
 
 
 ##### Constant Entry Rate
-def rate(t):
-    if t < 0:
-        return 0
-    return entrance_rate_constant
-def cum_rate(t):
-    if t < 0:
-        return 0
-    return entrance_rate_constant * t
-def cum_rate_inverse(y):
-    assert y >= 0
-    return y / entrance_rate_constant
+# def rate(t):
+#     if t < 0:
+#         return 0
+#     return entrance_rate_constant
+# def cum_rate(t):
+#     if t < 0:
+#         return 0
+#     return entrance_rate_constant * t
+# def cum_rate_inverse(y):
+#     assert y >= 0
+#     return y / entrance_rate_constant
 
 
 ##### Linear Entry Rate
@@ -372,11 +434,11 @@ duration_dist = scipy.stats.weibull_min(k, scale=scale)
 iot = InOutTheory(duration_dist, rate, cum_rate, cum_rate_inverse)
 
 
-t_sample_start = 100.0
-n_sample_ends = 100
+t_sample_start = 95.0
+n_sample_ends = 20
 max_sample_end = 150.0
-t_sample_ends = np.linspace(105.0, max_sample_end, num=n_sample_ends)
-n_simulations = 20_000
+t_sample_ends = np.linspace(102.0, max_sample_end, num=n_sample_ends)
+n_simulations = 100
 
 biases_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
 rmses_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
@@ -424,6 +486,13 @@ for i, t_sample_end in enumerate(t_sample_ends):
         rmses_wrt_mue[name][i] = rmse_wrt_mue
 
 
+# https://matplotlib.org/2.0.2/examples/color/color_cycle_demo.html
+# https://stackoverflow.com/questions/42086276/get-default-line-colour-cycle
+default_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+plt.rc('axes', prop_cycle=(cycler('color', default_cycle * 2) +
+                           cycler('linestyle', ['-']*10 + ['--']*10)))
+
+
 # Compare uninformed estimators
 plt.figure()
 for v in VERSIONS_UNINFORMED + ['entrances']:
@@ -442,7 +511,7 @@ plt.title('RMSE of uninformed estimators w.r.t. $\mu^e$')
 plt.legend()
 
 plt.figure()
-for v in VERSIONS_UNINFORMED + ['entrances']:
+for v in VERSIONS_UNINFORMED + ['entrances', 'entrances and exits unweighted average']:
     plt.plot(t_sample_ends, rmses_wrt_mu[v], label=v)
 plt.xlabel('sample end time')
 plt.ylabel('RMSE w.r.t. $\mu$')
@@ -450,7 +519,7 @@ plt.title('RMSE of uninformed estimators w.r.t. $\mu$')
 plt.legend()
 
 plt.figure()
-for v in VERSIONS_UNINFORMED + ['entrances']:
+for v in VERSIONS_UNINFORMED + ['entrances', 'entrances and exits unweighted average']:
     plt.plot(t_sample_ends, biases_wrt_mu[v], label=v)
 plt.xlabel('sample end time')
 plt.ylabel('bias w.r.t. $\mu$')
