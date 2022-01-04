@@ -438,7 +438,7 @@ t_sample_start = 95.0
 n_sample_ends = 20
 max_sample_end = 150.0
 t_sample_ends = np.linspace(102.0, max_sample_end, num=n_sample_ends)
-n_simulations = 100
+n_simulations = 1000
 
 biases_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
 rmses_wrt_mu = {v: np.empty(n_sample_ends) for v in VERSIONS}
