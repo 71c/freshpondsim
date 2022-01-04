@@ -1,6 +1,8 @@
 # freshpondsim
-This is a simulation program that models people going around a reservoir,
-or any long circular path, throughout time.
+This is a set of Python scripts which are used to verify and test a bunch of work I did on the theory of M_t/G/∞ queues (part of queueing theory) in Summer 2020 and Summer 2021. This code accompanies the extensive theoretical work I did, and verifies and tests a lot of the math I came up with.
+
+The project started as modeling how people go around a reservoir, or any long circular path, throughout time.
+Later, I generalized this and considered any state that objects can move in and out of. Only later, in late Summer 2021, did I discover that what I was doing was exploring the theory of what is called a M_t/G/∞ queue, and it is part of queueing theory.
 
 ## Files
 The main files are:
@@ -10,6 +12,11 @@ It contains two classes: `FreshPondPedestrian` and `FreshPondSim`.
   * A `FreshPondSim` object represents a simulation of people going around the reservoir.
     It cointains a list  of `FreshPondPedestrian`s stored in it called `pedestirans`.
     The number of people at time `t` is accessed by `self.n_people(t)`
+* `inout_theory.py`: defines two important classes:
+  * The class `InOutTheory` contains code that analytically computes formulas for properties of a M_t/G/∞ queue, and also code that can generate a random realization
+  * The class `InOutSimulation` is used to represent a simulation, or random realization, of a M_t/G/∞ queue. It is similar to `FreshPondSim`, but it is for a general M_t/G/∞ queue, not specifically a reservoir.
+* `get_times_3_improved.py`: tests out a lot of theory for estimating the average time that someone spends in the queue given just the entrance times and exit times
+* `variance_tests.py`: tests out a bunch of very complicated statistical theory for the variance of different things, which was to be used for estimating average staying time given entrances and exits (above). Some of the results are correct, some are not. I can't even understand this code just looking at it; I would need to look back at my math notes.
 * `function_interpolator.py`: This file contains three classes each of which interpolates a
 given 1D function as needed, in different ways.
 Objects of all three classes can be called as if they were functions.
