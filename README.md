@@ -1,4 +1,6 @@
 # freshpondsim
+**NOTE: See the PDF files [MtGinfty_queue_work.pdf](https://github.com/71c/freshpondsim/blob/master/MtGinfty_queue_work.pdf) and [estimation_notes.pdf](https://github.com/71c/freshpondsim/blob/master/estimation_notes.pdf) for detailed expositions of the theory that I developed.**
+
 This is a set of Python scripts which are used to verify and test a bunch of work I did on mathematically modeling the movement of people around a reservoir park, which I worked on in Summer 2020 and Summer 2021. This theory includes, for example, the theory of M_t/G/∞ queues (part of queueing theory).
 
 This code accompanies the extensive theoretical work I did, and verifies and tests a lot of the math I came up with.
