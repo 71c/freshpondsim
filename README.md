@@ -19,6 +19,7 @@ It contains two classes: `FreshPondPedestrian` and `FreshPondSim`.
   * The class `InOutSimulation` is used to represent a simulation, or random realization, of a M_t/G/∞ queue. It is similar to `FreshPondSim`, but it is for a general M_t/G/∞ queue, not specifically a reservoir.
 * `get_times_3_improved.py`: tests out a lot of theory for estimating the average time that someone spends in the queue given just the entrance times and exit times
 * `variance_tests.py`: tests out a bunch of very complicated statistical theory for the variance of different things, which was to be used for estimating average staying time given entrances and exits (above). Some of the results are correct, some are not.
+* `infer_time_distribution.py`: Tests various equations describing various aspects of the probability distributions of amount of time spent in the reservior, which can be used for inferring aspects of this probability distribution.
 * `function_interpolator.py`: This file contains three classes each of which interpolates a
 given 1D function as needed, in different ways.
 Objects of all three classes can be called as if they were functions.
